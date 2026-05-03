@@ -20,6 +20,25 @@ import { MCPTransport } from "../model/mcp-server-info";
 export { MCPTransport };
 
 /**
+ * Connection status for an MCP server
+ */
+export type MCPConnectionStatus = "connected" | "failed" | "connecting";
+
+/**
+ * MCP client with connection status information
+ */
+export interface MCPClientInfo {
+  /** The MCP client instance (only present if connected) */
+  client?: MCPClient;
+  /** Connection status */
+  status: MCPConnectionStatus;
+  /** Error message if connection failed */
+  error?: string;
+  /** Server URL */
+  url: string;
+}
+
+/**
  * Handler for MCP elicitation requests.
  * Receives the elicit request and a RequestHandlerExtra containing an AbortSignal that fires when the request is cancelled.
  * @param request - The elicitation request from the server
@@ -106,6 +125,12 @@ export class MCPClient {
   private authProvider?: OAuthClientProvider;
   private handlers: Partial<MCPHandlers>;
 
+  /** Current connection status */
+  public connectionStatus: MCPConnectionStatus = "connecting";
+
+  /** Error message if connection failed */
+  public connectionError?: string;
+
   /**
    * Private constructor to enforce using the static create method.
    * @param endpoint - The URL of the MCP server to connect to
@@ -158,10 +183,21 @@ export class MCPClient {
       sessionId,
       handlers,
     );
-    await mcpClient.client.connect(mcpClient.transport);
-    if ("sessionId" in mcpClient.transport) {
-      mcpClient.sessionId = mcpClient.transport.sessionId;
+
+    try {
+      await mcpClient.client.connect(mcpClient.transport);
+      if ("sessionId" in mcpClient.transport) {
+        mcpClient.sessionId = mcpClient.transport.sessionId;
+      }
+      mcpClient.connectionStatus = "connected";
+      mcpClient.connectionError = undefined;
+    } catch (error) {
+      mcpClient.connectionStatus = "failed";
+      mcpClient.connectionError =
+        error instanceof Error ? error.message : String(error);
+      throw error;
     }
+
     return mcpClient;
   }
 
@@ -265,6 +301,14 @@ export class MCPClient {
 
   getInstructions() {
     return this.client.getInstructions();
+  }
+
+  /**
+   * Get the endpoint URL for this MCP client.
+   * @returns The endpoint URL
+   */
+  getEndpoint(): string {
+    return this.endpoint;
   }
 
   /**
