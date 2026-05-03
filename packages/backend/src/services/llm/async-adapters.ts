@@ -55,7 +55,6 @@ export async function* runStreamingAgent(
   };
 
   const onAbort = () => {
-    // Only signal failure; centralize unsubscribe in finally for idempotent cleanup
     failOnce(new Error("Aborted"));
   };
 
