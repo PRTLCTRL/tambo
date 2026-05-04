@@ -627,7 +627,7 @@ interface StreamStatus {
 
 ### PropStatus
 
-Per-prop streaming status, returned by `useTamboStreamStatus()`.
+Per-prop streaming status, returned by `useTamboStreamStatus()`. For nested objects, contains additional nested `PropStatus` fields. For arrays, includes `completedItems` and `streamingItems`.
 
 ```typescript
 interface PropStatus {
@@ -635,15 +635,26 @@ interface PropStatus {
   isStreaming: boolean;
   isSuccess: boolean;
   error?: Error;
+  completedItems?: unknown[];
+  streamingItems?: unknown[];
 }
 ```
 
-| Property      | Type      | Description                                        |
-| ------------- | --------- | -------------------------------------------------- |
-| `isPending`   | `boolean` | No tokens received for this prop yet               |
-| `isStreaming` | `boolean` | Tokens received but streaming is not complete      |
-| `isSuccess`   | `boolean` | This prop has finished streaming successfully      |
-| `error`       | `Error`   | Error that occurred during streaming for this prop |
+| Property          | Type        | Description                                                      |
+| ----------------- | ----------- | ---------------------------------------------------------------- |
+| `isPending`       | `boolean`   | No tokens received for this prop yet                             |
+| `isStreaming`     | `boolean`   | Tokens received but streaming is not complete                    |
+| `isSuccess`       | `boolean`   | This prop has finished streaming successfully                    |
+| `error`           | `Error`     | Error that occurred during streaming for this prop               |
+| `completedItems`  | `unknown[]` | For arrays: items that have completed streaming                  |
+| `streamingItems`  | `unknown[]` | For arrays: items currently being streamed                       |
+
+For nested objects, `PropStatus` recursively contains status for nested fields. Access using dot notation:
+
+```typescript
+propStatus.user?.name?.isStreaming
+propStatus.config?.database?.host?.isSuccess
+```
 
 ## Tool Annotations
 

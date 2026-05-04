@@ -384,7 +384,7 @@ function EditableCard({ title: initialTitle }: { title: string }) {
 
 ## useTamboStreamStatus
 
-Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity.
+Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity, including support for nested objects and arrays.
 
 **Important**: Props update repeatedly during streaming and may be partial. Use `propStatus.<field>?.isSuccess` before treating a prop as complete.
 
@@ -418,6 +418,57 @@ function MyComponent(props: MyProps) {
   This hook only works inside components rendered via `ComponentRenderer`. The
   renderer provides the necessary context for tracking streaming state.
 </Callout>
+
+### Nested Object Support
+
+Track streaming status of nested object properties by accessing them through the status hierarchy:
+
+```tsx
+interface NestedProps {
+  user: {
+    name: string;
+    email: string;
+  };
+}
+
+function UserCard(props: NestedProps) {
+  const { propStatus } = useTamboStreamStatus<NestedProps>();
+
+  return (
+    <div>
+      {propStatus.user?.name?.isStreaming ? (
+        <Skeleton className="h-6 w-32" />
+      ) : (
+        <h3>{props.user.name}</h3>
+      )}
+      {propStatus.user?.email?.isPending && <span>Loading email...</span>}
+    </div>
+  );
+}
+```
+
+### Array Support
+
+For array props, access `completedItems` and `streamingItems` to render items incrementally:
+
+```tsx
+interface ListProps {
+  items: Array<{ id: string; title: string }>;
+}
+
+function ItemList(props: ListProps) {
+  const { propStatus } = useTamboStreamStatus<ListProps>();
+
+  return (
+    <div>
+      {propStatus.items?.completedItems?.map((item) => (
+        <div key={item.id}>{item.title}</div>
+      ))}
+      {propStatus.items?.isStreaming && <Spinner />}
+    </div>
+  );
+}
+```
 
 ## useTamboSuggestions
 
