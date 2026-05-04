@@ -13,13 +13,15 @@
  */
 
 import { parse } from "partial-json";
-import React, { type FC, useMemo, useContext } from "react";
+import React, { type FC, useMemo, useContext, useEffect, useRef } from "react";
 import { TamboRegistryContext } from "../../providers/tambo-registry-provider";
+import { useTamboInteractable } from "../../providers/tambo-interactable-provider";
 import { isStandardSchema } from "../../schema";
 import { isPromise } from "../../util/is-promise";
 import { getComponentFromRegistry } from "../../util/registry";
 import type { TamboComponentContent } from "../types/message";
 import { ComponentContentProvider } from "../utils/component-renderer";
+import { useTamboConfig } from "../providers/tambo-v1-provider";
 
 export interface ComponentRendererProps {
   /**
@@ -76,6 +78,10 @@ export const ComponentRenderer: FC<ComponentRendererProps> = ({
   fallback = null,
 }) => {
   const registry = useContext(TamboRegistryContext);
+  const { addInteractableComponent, getInteractableComponent } =
+    useTamboInteractable();
+  const config = useTamboConfig();
+  const interactableIdRef = useRef<string | null>(null);
 
   // Memoize the rendered element - only recreates when props change
   const element = useMemo(() => {
@@ -136,6 +142,42 @@ export const ComponentRenderer: FC<ComponentRendererProps> = ({
     messageId,
     threadId,
     registry.componentList,
+  ]);
+
+  // Auto-add to interactables if enabled
+  useEffect(() => {
+    if (config.autoInteractables && element !== null) {
+      // Check if component already exists in interactables
+      const existingComponent = getInteractableComponent(content.id);
+      if (!existingComponent) {
+        // Get the registered component metadata
+        const registeredComponent = getComponentFromRegistry(
+          content.name,
+          registry.componentList,
+        );
+
+        // Add to interactables using the component ID from the message
+        const id = addInteractableComponent({
+          name: content.name,
+          description:
+            registeredComponent.description ??
+            `${content.name} component from message`,
+          component: registeredComponent.component,
+          props: (content.props ?? {}) as Record<string, unknown>,
+          propsSchema: registeredComponent.props,
+        });
+        interactableIdRef.current = id;
+      }
+    }
+  }, [
+    config.autoInteractables,
+    content.id,
+    content.name,
+    content.props,
+    element,
+    registry.componentList,
+    addInteractableComponent,
+    getInteractableComponent,
   ]);
 
   if (element === null) {
