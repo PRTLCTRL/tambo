@@ -364,8 +364,12 @@ interface PropStatus {
   isStreaming: boolean; // Prop has partial content, still updating
   isSuccess: boolean; // Prop finished streaming successfully
   error?: Error; // Error during streaming (if any)
+  completedItems?: unknown[]; // For array props: completed items
+  streamingItems?: unknown[]; // For array props: all items (including incomplete)
 }
 ```
+
+For nested object props, `PropStatus` includes nested status properties matching the object structure. For example, if your component has a `user` prop with `name` and `email` fields, `propStatus.user` will include `name` and `email` status objects.
 
 ## TamboInteractableComponent
 
