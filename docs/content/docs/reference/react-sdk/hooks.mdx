@@ -384,9 +384,11 @@ function EditableCard({ title: initialTitle }: { title: string }) {
 
 ## useTamboStreamStatus
 
-Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity.
+Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity, including support for nested objects and arrays.
 
 **Important**: Props update repeatedly during streaming and may be partial. Use `propStatus.<field>?.isSuccess` before treating a prop as complete.
+
+### Basic Usage
 
 ```tsx
 import { useTamboStreamStatus } from "@tambo-ai/react";
@@ -402,6 +404,75 @@ function MyComponent(props: MyProps) {
         {props.title}
       </h2>
       {streamStatus.isSuccess && <p>Stream complete</p>}
+    </div>
+  );
+}
+```
+
+### Nested Object Support
+
+Access streaming status for nested properties using dot notation:
+
+```tsx
+interface UserProps {
+  user: {
+    name: string;
+    email: string;
+    profile: {
+      bio: string;
+      avatar: string;
+    };
+  };
+}
+
+function UserCard(props: UserProps) {
+  const { propStatus } = useTamboStreamStatus<UserProps>();
+
+  return (
+    <div>
+      <h2 className={propStatus.user?.name?.isStreaming ? "animate-pulse" : ""}>
+        {props.user.name}
+      </h2>
+      <p className={propStatus.user?.email?.isStreaming ? "animate-pulse" : ""}>
+        {props.user.email}
+      </p>
+      <p className={propStatus.user?.profile?.bio?.isStreaming ? "animate-pulse" : ""}>
+        {props.user.profile.bio}
+      </p>
+    </div>
+  );
+}
+```
+
+### Array Support
+
+For array props, access `completedItems` and `streamingItems` to render items as they complete:
+
+```tsx
+interface ListProps {
+  items: { id: string; name: string; description: string }[];
+}
+
+function ItemList(props: ListProps) {
+  const { propStatus } = useTamboStreamStatus<ListProps>();
+
+  const completed = propStatus.items?.completedItems as ListProps["items"] ?? [];
+  const streaming = propStatus.items?.streamingItems as ListProps["items"] ?? [];
+
+  return (
+    <div>
+      {completed.map((item) => (
+        <div key={item.id}>
+          <h3>{item.name}</h3>
+          <p>{item.description}</p>
+        </div>
+      ))}
+      {streaming.map((item) => (
+        <div key={item.id} className="opacity-50 animate-pulse">
+          <h3>{item.name}</h3>
+          <p>{item.description}</p>
+        </div>
+      ))}
     </div>
   );
 }
