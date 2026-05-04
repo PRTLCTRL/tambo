@@ -640,14 +640,14 @@ interface PropStatus {
 }
 ```
 
-| Property         | Type        | Description                                                        |
-| ---------------- | ----------- | ------------------------------------------------------------------ |
-| `isPending`      | `boolean`   | No tokens received for this prop yet                               |
-| `isStreaming`    | `boolean`   | Tokens received but streaming is not complete                      |
-| `isSuccess`      | `boolean`   | This prop has finished streaming successfully                      |
-| `error`          | `Error`     | Error that occurred during streaming for this prop                 |
-| `completedItems` | `unknown[]` | **(Arrays only)** Items that have finished streaming               |
-| `streamingItems` | `unknown[]` | **(Arrays only)** Items currently being streamed                   |
+| Property         | Type        | Description                                          |
+| ---------------- | ----------- | ---------------------------------------------------- |
+| `isPending`      | `boolean`   | No tokens received for this prop yet                 |
+| `isStreaming`    | `boolean`   | Tokens received but streaming is not complete        |
+| `isSuccess`      | `boolean`   | This prop has finished streaming successfully        |
+| `error`          | `Error`     | Error that occurred during streaming for this prop   |
+| `completedItems` | `unknown[]` | **(Arrays only)** Items that have finished streaming |
+| `streamingItems` | `unknown[]` | **(Arrays only)** Items currently being streamed     |
 
 For nested objects, `PropStatus` extends to include nested properties with their own status. For example, a prop `user: { name: string; email: string }` would have `propStatus.user.name` and `propStatus.user.email` accessible.
 

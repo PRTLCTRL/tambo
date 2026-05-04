@@ -466,11 +466,14 @@ function TaskList(props: TaskListProps) {
           <li key={task.id}>{task.title}</li>
         ))}
       </ul>
-      {propStatus.tasks?.streamingItems && propStatus.tasks.streamingItems.length > 0 && (
-        <div className="opacity-50">
-          <p>Streaming {propStatus.tasks.streamingItems.length} more items...</p>
-        </div>
-      )}
+      {propStatus.tasks?.streamingItems &&
+        propStatus.tasks.streamingItems.length > 0 && (
+          <div className="opacity-50">
+            <p>
+              Streaming {propStatus.tasks.streamingItems.length} more items...
+            </p>
+          </div>
+        )}
     </div>
   );
 }
@@ -478,9 +481,9 @@ function TaskList(props: TaskListProps) {
 
 ### Return Values
 
-| Value          | Type                                                      | Description                                                                                                                                    |
-| -------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `streamStatus` | [`StreamStatus`](/reference/react-sdk/types#streamstatus) | Overall streaming status for the component                                                                                                     |
+| Value          | Type                                                      | Description                                                                                                                                                                  |
+| -------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `streamStatus` | [`StreamStatus`](/reference/react-sdk/types#streamstatus) | Overall streaming status for the component                                                                                                                                   |
 | `propStatus`   | `Partial<Record<keyof Props, NestedPropStatus>>`          | Per-prop streaming status with nested structure support. Keys are absent until the prop receives its first token. See [`PropStatus`](/reference/react-sdk/types#propstatus). |
 
 <Callout type="info">
@@ -489,8 +492,9 @@ function TaskList(props: TaskListProps) {
 </Callout>
 
 <Callout type="tip">
-  For nested objects, access nested status via `propStatus.parent?.child?.isStreaming`.
-  For arrays, use `propStatus.arrayField?.completedItems` to render only finished items.
+  For nested objects, access nested status via
+  `propStatus.parent?.child?.isStreaming`. For arrays, use
+  `propStatus.arrayField?.completedItems` to render only finished items.
 </Callout>
 
 ## useTamboSuggestions
