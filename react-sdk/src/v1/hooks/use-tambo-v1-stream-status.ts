@@ -80,65 +80,246 @@ export interface PropStatus {
    * Will be undefined if no error occurred for this prop.
    */
   error?: Error;
+
+  /**
+   * For array props, contains the items that have finished streaming.
+   * Only present when the prop is an array.
+   */
+  completedItems?: unknown[];
+
+  /**
+   * For array props, contains the items currently streaming.
+   * Only present when the prop is an array.
+   */
+  streamingItems?: unknown[];
+}
+
+/**
+ * Recursively builds nested PropStatus for objects and arrays.
+ * Objects get nested PropStatus for each property.
+ * Arrays get completedItems and streamingItems in addition to their own status.
+ */
+export type NestedPropStatus<T> = T extends (infer U)[]
+  ? PropStatus & {
+      completedItems?: U[];
+      streamingItems?: U[];
+    }
+  : T extends object
+    ? PropStatus & {
+        [K in keyof T]?: NestedPropStatus<T[K]>;
+      }
+    : PropStatus;
+
+/**
+ * Helper to check if a value has content (not empty).
+ * For objects and arrays, recursively checks for actual content.
+ * @param value - Value to check
+ * @returns True if value has content
+ */
+function hasContent(value: unknown): boolean {
+  if (value === undefined || value === null || value === "") return false;
+
+  if (Array.isArray(value)) {
+    return value.length > 0 && value.some((item) => hasContent(item));
+  }
+
+  if (typeof value === "object") {
+    return Object.values(value).some((v) => hasContent(v));
+  }
+
+  return true;
+}
+
+/**
+ * Helper to create nested PropStatus for objects and arrays recursively.
+ * @param value - The current value
+ * @param path - Path to this value (for tracking started state)
+ * @param startedProps - Set of paths that have started
+ * @param isStreamingDone - Whether component streaming is complete
+ * @param isComponentStreaming - Whether component is currently streaming
+ * @returns PropStatus with nested structure if applicable
+ */
+function createNestedPropStatus(
+  value: unknown,
+  path: string,
+  startedProps: Set<string>,
+  isStreamingDone: boolean,
+  isComponentStreaming: boolean,
+): PropStatus {
+  const hasStarted = startedProps.has(path);
+  const isComplete = hasStarted && isStreamingDone;
+
+  const baseStatus: PropStatus = {
+    isPending: !hasStarted && !isComplete,
+    isStreaming: hasStarted && !isComplete && isComponentStreaming,
+    isSuccess: isComplete,
+    error: undefined,
+  };
+
+  if (Array.isArray(value)) {
+    const completedItems: unknown[] = [];
+    const streamingItems: unknown[] = [];
+
+    value.forEach((item, index) => {
+      const itemPath = `${path}[${index}]`;
+      const itemHasStarted = startedProps.has(itemPath);
+      const itemIsComplete = itemHasStarted && isStreamingDone;
+
+      if (itemIsComplete) {
+        completedItems.push(item);
+      } else if (itemHasStarted && isComponentStreaming) {
+        streamingItems.push(item);
+      }
+    });
+
+    return {
+      ...baseStatus,
+      completedItems,
+      streamingItems,
+    };
+  }
+
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    const nested: Record<string, PropStatus> = {};
+
+    for (const [key, childValue] of Object.entries(value)) {
+      const childPath = `${path}.${key}`;
+      nested[key] = createNestedPropStatus(
+        childValue,
+        childPath,
+        startedProps,
+        isStreamingDone,
+        isComponentStreaming,
+      );
+    }
+
+    return {
+      ...baseStatus,
+      ...nested,
+    };
+  }
+
+  return baseStatus;
 }
 
 /**
  * Track streaming status for individual props by monitoring their values.
  * Monitors when props receive their first token and when they complete streaming.
+ * Supports nested objects and arrays with granular status tracking.
  * @template Props - The type of the component props being tracked
  * @param props - The current component props object
  * @param componentStreamingState - The current streaming state of the component
- * @returns A record mapping each prop key to its PropStatus
+ * @returns A record mapping each prop key to its NestedPropStatus
  */
 function usePropsStreamingStatus<Props extends object>(
   props: Props | undefined,
   componentStreamingState: TamboComponentContent["streamingState"] | undefined,
-): Partial<Record<keyof Props, PropStatus>> {
-  /** Track which props have received content */
+): Partial<Record<keyof Props, NestedPropStatus<Props[keyof Props]>>> {
+  /** Track which prop paths have received content */
   const [startedProps, setStartedProps] = useState(new Set<string>());
+
+  /** Recursively track all paths that have content */
+  const trackPaths = useRef((obj: unknown, basePath = ""): Set<string> => {
+    const paths = new Set<string>();
+
+    if (!obj || typeof obj !== "object") {
+      if (hasContent(obj) && basePath) {
+        paths.add(basePath);
+      }
+      return paths;
+    }
+
+    if (Array.isArray(obj)) {
+      if (basePath && hasContent(obj)) {
+        paths.add(basePath);
+      }
+      obj.forEach((item, index) => {
+        const itemPath = basePath ? `${basePath}[${index}]` : `[${index}]`;
+        if (hasContent(item)) {
+          paths.add(itemPath);
+          const childPaths = trackPaths.current(item, itemPath);
+          childPaths.forEach((p) => paths.add(p));
+        }
+      });
+      return paths;
+    }
+
+    if (basePath && hasContent(obj)) {
+      paths.add(basePath);
+    }
+
+    for (const [key, value] of Object.entries(obj)) {
+      const path = basePath ? `${basePath}.${key}` : key;
+      if (hasContent(value)) {
+        paths.add(path);
+        const childPaths = trackPaths.current(value, path);
+        childPaths.forEach((p) => paths.add(p));
+      }
+    }
+
+    return paths;
+  });
 
   /** Update started props when content arrives */
   useEffect(() => {
     if (!props) return;
 
     setStartedProps((prev) => {
-      let changed = false;
-      const newStarted = new Set(prev);
+      const newPaths = trackPaths.current(props);
+      const combined = new Set([...prev, ...newPaths]);
 
-      for (const [key, value] of Object.entries(props)) {
-        const hasContent =
-          value !== undefined && value !== null && value !== "";
-        if (hasContent && !newStarted.has(key)) {
-          newStarted.add(key);
-          changed = true;
-        }
-      }
-
-      return changed ? newStarted : prev;
+      if (combined.size === prev.size) return prev;
+      return combined;
     });
   }, [props]);
 
   /** Derive prop statuses from started props and streaming state */
   return useMemo(() => {
-    if (!props) return {} as Record<keyof Props, PropStatus>;
+    if (!props)
+      return {} as Record<keyof Props, NestedPropStatus<Props[keyof Props]>>;
 
     const isStreamingDone = componentStreamingState === "done";
     const isComponentStreaming = componentStreamingState === "streaming";
 
-    const result = {} as Record<keyof Props, PropStatus>;
+    const result = {} as Record<
+      keyof Props,
+      NestedPropStatus<Props[keyof Props]>
+    >;
     for (const key of Object.keys(props)) {
-      const hasStarted = startedProps.has(key);
-      const isComplete = hasStarted && isStreamingDone;
-
-      result[key as keyof Props] = {
-        isPending: !hasStarted && !isComplete,
-        isStreaming: hasStarted && !isComplete && isComponentStreaming,
-        isSuccess: isComplete,
-        error: undefined,
-      };
+      const value = props[key as keyof Props];
+      result[key as keyof Props] = createNestedPropStatus(
+        value,
+        key,
+        startedProps,
+        isStreamingDone,
+        isComponentStreaming,
+      ) as NestedPropStatus<Props[keyof Props]>;
     }
     return result;
   }, [props, startedProps, componentStreamingState]);
+}
+
+/**
+ * Recursively extract all PropStatus objects from nested structure.
+ * @param propStatus - The potentially nested prop status
+ * @returns Flat array of all PropStatus objects
+ */
+function flattenPropStatuses(propStatus: unknown): PropStatus[] {
+  if (!propStatus || typeof propStatus !== "object") return [];
+
+  const statuses: PropStatus[] = [];
+
+  if ("isPending" in propStatus && "isStreaming" in propStatus) {
+    statuses.push(propStatus as PropStatus);
+  }
+
+  for (const value of Object.values(propStatus)) {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      statuses.push(...flattenPropStatuses(value));
+    }
+  }
+
+  return statuses;
 }
 
 /**
@@ -146,35 +327,43 @@ function usePropsStreamingStatus<Props extends object>(
  * Aggregates individual prop states into a unified stream status.
  * @template Props - The type of the component props
  * @param componentStreamingState - The current streaming state of the component
- * @param propStatus - Status record for each individual prop
+ * @param propStatus - Status record for each individual prop (may be nested)
  * @param hasComponent - Whether a component exists in the current message
  * @param streamError - Any error from the streaming process itself
  * @returns The aggregated StreamStatus for the entire component
  */
 function deriveGlobalStreamStatus(
   componentStreamingState: TamboComponentContent["streamingState"] | undefined,
-  propStatus: Partial<Record<string, PropStatus>>,
+  propStatus: Partial<Record<string, unknown>>,
   hasComponent: boolean,
   streamError?: Error,
 ): StreamStatus {
-  const propStatuses: PropStatus[] = Object.values(propStatus).filter(
-    (p): p is PropStatus => p !== undefined,
+  const topLevelStatuses = Object.values(propStatus).filter(
+    (p): p is PropStatus =>
+      p !== null &&
+      p !== undefined &&
+      typeof p === "object" &&
+      "isPending" in p,
   );
+
+  const allPropStatuses = topLevelStatuses.flatMap((status) =>
+    flattenPropStatuses(status),
+  );
+
+  const propStatuses =
+    allPropStatuses.length > 0 ? allPropStatuses : topLevelStatuses;
+
   const isStreamError = !!streamError;
 
-  // If all props are already successful, the component is complete regardless of streaming state
   const allPropsSuccessful =
     propStatuses.length > 0 && propStatuses.every((p) => p.isSuccess);
 
-  // Component is streaming if streamingState is "streaming" (even before props start)
   const isComponentStreaming = componentStreamingState === "streaming";
   const anyPropStreaming = propStatuses.some((p) => p.isStreaming);
 
-  /** Find first error from stream or any prop */
   const firstError = streamError ?? propStatuses.find((p) => p.error)?.error;
 
   return {
-    /** isPending: no component yet OR (not streaming, not error, not success, and all props pending) */
     isPending:
       !hasComponent ||
       (!isStreamError &&
@@ -182,13 +371,10 @@ function deriveGlobalStreamStatus(
         !allPropsSuccessful &&
         propStatuses.every((p) => p.isPending)),
 
-    /** isStreaming: component is streaming OR any prop is streaming (but not if error) */
     isStreaming: !isStreamError && (isComponentStreaming || anyPropStreaming),
 
-    /** isSuccess: all props successful and no error */
     isSuccess: allPropsSuccessful && !isStreamError,
 
-    /** isError: stream error OR any prop error */
     isError: isStreamError || propStatuses.some((p) => p.error),
 
     streamError: firstError,
@@ -201,10 +387,14 @@ function deriveGlobalStreamStatus(
  * **Important**: Props update repeatedly during streaming and may be partial.
  * Use `propStatus.<field>?.isSuccess` before treating a prop as complete.
  *
+ * Supports nested objects and arrays with granular status tracking.
+ * For nested objects, access status via `propStatus.parent?.child?.isStreaming`.
+ * For arrays, use `propStatus.arrayField?.completedItems` and `propStatus.arrayField?.streamingItems`.
+ *
  * Pair with `useTamboComponentState` to disable inputs while streaming.
  * @see {@link https://docs.tambo.co/concepts/generative-interfaces/component-state}
  * @template Props - Component props type
- * @returns `streamStatus` (overall) and `propStatus` (per-prop) flags
+ * @returns `streamStatus` (overall) and `propStatus` (per-prop with nested structure) flags
  * @throws {Error} When used outside a rendered component
  * @example
  * ```tsx
@@ -221,12 +411,34 @@ function deriveGlobalStreamStatus(
  *   {title}
  * </h2>
  * ```
+ * @example
+ * ```tsx
+ * // Track nested object status
+ * const { propStatus } = useTamboStreamStatus<{ user: { name: string; email: string } }>();
+ * <div>
+ *   <span className={propStatus.user?.name?.isStreaming ? "animate-pulse" : ""}>
+ *     {user.name}
+ *   </span>
+ * </div>
+ * ```
+ * @example
+ * ```tsx
+ * // Use completed array items
+ * const { propStatus } = useTamboStreamStatus<{ items: string[] }>();
+ * <ul>
+ *   {propStatus.items?.completedItems?.map((item) => (
+ *     <li key={item}>{item}</li>
+ *   ))}
+ * </ul>
+ * ```
  */
 export function useTamboStreamStatus<
   Props extends object = Record<string, unknown>,
 >(): {
   streamStatus: StreamStatus;
-  propStatus: Partial<Record<keyof Props, PropStatus>>;
+  propStatus: Partial<
+    Record<keyof Props, NestedPropStatus<Props[keyof Props]>>
+  >;
 } {
   const { componentId, threadId } = useComponentContent();
   const streamState = useStreamState();
