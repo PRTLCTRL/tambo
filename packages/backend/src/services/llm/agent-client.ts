@@ -101,8 +101,8 @@ function enhanceAgentError(
         ``,
         `💡 ${hint}`,
         ``,
-        `📚 See documentation for the required AG-UI protocol format:`,
-        `   https://docs.tambo.co/guides/agent-providers/${agentProviderType}`,
+        `📚 See documentation for configuring custom agent providers:`,
+        `   https://docs.tambo.co/concepts/agent-configuration`,
         ``,
         `Original error: ${errorMessage}`,
       ].join("\n");
@@ -127,8 +127,8 @@ function enhanceAgentError(
     `   • OpenAI-style streaming instead of AG-UI events`,
     `   • Non-streaming JSON response`,
     ``,
-    `📚 See documentation for the required AG-UI protocol format:`,
-    `   https://docs.tambo.co/guides/agent-providers/${agentProviderType}`,
+    `📚 See documentation for configuring custom agent providers:`,
+    `   https://docs.tambo.co/concepts/agent-configuration`,
     ``,
     `Original error: ${errorMessage}`,
   ].join("\n");
