@@ -10,6 +10,7 @@
     "take-actions",
     "add-authentication",
     "connect-mcp-servers",
+    "agent-providers",
     "self-hosting"
   ]
 }

@@ -1,0 +1,296 @@
+---
+title: LlamaIndex Agent Provider
+description: Configure custom LlamaIndex agent endpoints with proper SSE streaming format
+---
+
+import { ImageZoom } from "fumadocs-ui/components/image-zoom";
+
+When using **LlamaIndex** as your agent provider in Tambo Cloud, you can point to a custom agent URL that implements your own LlamaIndex workflow. This guide explains the exact contract your endpoint must follow to integrate successfully.
+
+## Overview
+
+Tambo Cloud makes HTTP POST requests to your custom Agent URL expecting Server-Sent Events (SSE) responses that conform to the AGUI protocol. This protocol defines specific event types for streaming AI responses, tool calls, thinking steps, and state updates.
+
+## Request Format
+
+Your endpoint will receive POST requests with the following structure:
+
+### Headers
+
+```
+Content-Type: application/json
+Accept: text/event-stream
+```
+
+Plus any custom headers you configured in your project settings (e.g., authorization tokens).
+
+### Request Body
+
+```json
+{
+  "threadId": "thread-abc123",
+  "runId": "run-def456",
+  "messages": [
+    {
+      "id": "msg-1",
+      "role": "user",
+      "content": "Hello, how can you help me?"
+    },
+    {
+      "id": "msg-2",
+      "role": "assistant",
+      "content": "I can help you with...",
+      "toolCalls": [
+        {
+          "id": "call-123",
+          "type": "function",
+          "function": {
+            "name": "get_weather",
+            "arguments": "{\"location\":\"New York\"}"
+          }
+        }
+      ]
+    },
+    {
+      "id": "msg-3",
+      "role": "tool",
+      "content": "{\"temperature\": 72, \"condition\": \"sunny\"}",
+      "toolCallId": "call-123"
+    }
+  ],
+  "tools": [
+    {
+      "name": "get_weather",
+      "description": "Fetches weather for a location",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "location": { "type": "string" }
+        },
+        "required": ["location"]
+      }
+    }
+  ],
+  "context": [],
+  "forwardedProps": {},
+  "state": {}
+}
+```
+
+### Message Roles
+
+- `user` - Messages from the end user
+- `assistant` - AI responses (may include `toolCalls` array)
+- `tool` - Results from tool executions (includes `toolCallId` linking to assistant message)
+- `system` - System-level instructions (rare in production threads)
+- `developer` - Developer-provided context
+
+## Response Format (SSE Streaming)
+
+Your endpoint must return `text/event-stream` with events in the following format:
+
+```
+data: {"type":"TEXT_MESSAGE_START","messageId":"msg-4","role":"assistant"}
+
+data: {"type":"TEXT_MESSAGE_CONTENT","messageId":"msg-4","delta":"Hello"}
+
+data: {"type":"TEXT_MESSAGE_CONTENT","messageId":"msg-4","delta":" there!"}
+
+data: {"type":"TEXT_MESSAGE_END","messageId":"msg-4"}
+
+data: {"type":"RUN_FINISHED","result":"Conversation completed"}
+```
+
+Each line starts with `data:` followed by a JSON object. Events are separated by blank lines (`\n\n`).
+
+### Supported Event Types
+
+#### Text Messages
+
+Stream assistant responses character-by-character or in chunks:
+
+```json
+{"type":"TEXT_MESSAGE_START","messageId":"msg-4","role":"assistant"}
+{"type":"TEXT_MESSAGE_CONTENT","messageId":"msg-4","delta":"Hello"}
+{"type":"TEXT_MESSAGE_END","messageId":"msg-4"}
+```
+
+Or use the chunk variant (which auto-starts/ends):
+
+```json
+{"type":"TEXT_MESSAGE_CHUNK","messageId":"msg-4","delta":"Hello","role":"assistant"}
+```
+
+#### Tool Calls
+
+When the AI wants to call a tool:
+
+```json
+{"type":"TOOL_CALL_START","toolCallId":"call-5","toolCallName":"get_weather","parentMessageId":"msg-4"}
+{"type":"TOOL_CALL_ARGS","toolCallId":"call-5","delta":"{\"location\":\""}
+{"type":"TOOL_CALL_ARGS","toolCallId":"call-5","delta":"New York\"}"}
+{"type":"TOOL_CALL_END","toolCallId":"call-5"}
+```
+
+Or use chunks:
+
+```json
+{"type":"TOOL_CALL_CHUNK","toolCallId":"call-5","toolCallName":"get_weather","delta":"{\"location\":\"New York\"}","parentMessageId":"msg-4"}
+```
+
+After your server executes the tool, return the result:
+
+```json
+{"type":"TOOL_CALL_RESULT","toolCallId":"call-5","messageId":"tool-msg-1","content":"{\"temperature\":72,\"condition\":\"sunny\"}"}
+```
+
+#### Thinking (Extended Thinking / Reasoning)
+
+For models that support extended thinking (like OpenAI o3 or Gemini 2.0 Flash Thinking):
+
+```json
+{"type":"THINKING_START"}
+{"type":"THINKING_TEXT_MESSAGE_START"}
+{"type":"THINKING_TEXT_MESSAGE_CONTENT","delta":"Let me analyze this step by step..."}
+{"type":"THINKING_TEXT_MESSAGE_END"}
+{"type":"THINKING_END"}
+```
+
+#### Run Control
+
+Every run should start and end with these events:
+
+```json
+{"type":"RUN_STARTED"}
+// ... other events ...
+{"type":"RUN_FINISHED","result":"Success"}
+```
+
+Or if an error occurs:
+
+```json
+{"type":"RUN_ERROR","message":"Something went wrong","code":"INTERNAL_ERROR"}
+```
+
+#### State Updates
+
+For stateful agents that need to persist data:
+
+```json
+{"type":"STATE_SNAPSHOT","snapshot":{"key":"value"}}
+```
+
+Or incremental updates using JSON Patch:
+
+```json
+{"type":"STATE_DELTA","delta":[{"op":"add","path":"/newKey","value":"newValue"}]}
+```
+
+#### Messages Snapshot
+
+To replace the entire message history:
+
+```json
+{"type":"MESSAGES_SNAPSHOT","messages":[{"id":"msg-1","role":"user","content":"Hello"}]}
+```
+
+## Minimal Working Example
+
+Here's a complete SSE response for a simple text message:
+
+```
+data: {"type":"RUN_STARTED"}
+
+data: {"type":"TEXT_MESSAGE_START","messageId":"msg-response","role":"assistant"}
+
+data: {"type":"TEXT_MESSAGE_CONTENT","messageId":"msg-response","delta":"Hello! I'm your LlamaIndex agent. How can I help you today?"}
+
+data: {"type":"TEXT_MESSAGE_END","messageId":"msg-response"}
+
+data: {"type":"RUN_FINISHED","result":"Message sent"}
+```
+
+## Common Errors
+
+### `INTERNAL_ERROR` or `Error in input stream`
+
+These errors occur when:
+
+1. **Invalid JSON in SSE events** - Each `data:` line must contain valid JSON
+2. **Missing event type** - Every event must have a `type` field
+3. **Unknown event type** - Event type must be one of the supported types listed above
+4. **Incomplete event sequences** - Started events (e.g., `TEXT_MESSAGE_START`) must be closed with corresponding end events
+5. **Invalid Content-Type** - Response must use `Content-Type: text/event-stream`
+
+### Debug Tips
+
+- Test your endpoint with `curl` to verify SSE format:
+
+```bash
+curl -X POST https://your-agent-url.com/v1/run \
+  -H "Content-Type: application/json" \
+  -H "Accept: text/event-stream" \
+  -d '{"threadId":"test","runId":"test","messages":[],"tools":[]}'
+```
+
+- Validate each line starts with `data:` and contains parseable JSON
+- Ensure events are separated by blank lines (`\n\n`)
+- Check that `TEXT_MESSAGE_START` has a matching `TEXT_MESSAGE_END`
+- Verify `TOOL_CALL_START` has a matching `TOOL_CALL_END`
+
+## Protocol Buffers (Advanced)
+
+Instead of SSE with JSON, you can use the binary Protocol Buffer format by returning `Content-Type: application/x-protobuf-agui-stream`. Each message is length-prefixed (4 bytes big-endian) followed by the protobuf-encoded event.
+
+Most implementations should use SSE+JSON as it's easier to debug and widely supported.
+
+## Testing Your Integration
+
+1. Configure your custom Agent URL in Tambo Cloud project settings
+2. Add any required headers (API keys, auth tokens)
+3. Test with a simple message in a thread
+4. Check browser dev tools Network tab for SSE stream
+5. Verify events are being parsed correctly
+
+If you encounter issues, the API logs in your project dashboard will show the specific parsing errors.
+
+## Example Implementation
+
+Here's a minimal FastAPI endpoint that returns valid SSE events:
+
+```python
+from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
+import json
+
+app = FastAPI()
+
+@app.post("/v1/run")
+async def run_agent(request: dict):
+    async def generate():
+        # Start the run
+        yield f"data: {json.dumps({'type': 'RUN_STARTED'})}\n\n"
+        
+        # Start assistant message
+        msg_id = "response-1"
+        yield f"data: {json.dumps({'type': 'TEXT_MESSAGE_START', 'messageId': msg_id, 'role': 'assistant'})}\n\n"
+        
+        # Stream content
+        response_text = "Hello from LlamaIndex!"
+        for char in response_text:
+            yield f"data: {json.dumps({'type': 'TEXT_MESSAGE_CONTENT', 'messageId': msg_id, 'delta': char})}\n\n"
+        
+        # End message
+        yield f"data: {json.dumps({'type': 'TEXT_MESSAGE_END', 'messageId': msg_id})}\n\n"
+        
+        # Finish run
+        yield f"data: {json.dumps({'type': 'RUN_FINISHED', 'result': 'Success'})}\n\n"
+    
+    return StreamingResponse(generate(), media_type="text/event-stream")
+```
+
+## Next Steps
+
+- Review the [Agent Configuration](/concepts/agent-configuration) guide for provider setup
+- Learn about [Tool Registration](/guides/take-actions/register-tools) for function calling
+- Explore [MCP Integration](/concepts/model-context-protocol) for extended capabilities

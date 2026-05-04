@@ -1,0 +1,81 @@
+---
+title: Custom Agent Providers
+description: Integrate custom agent frameworks and endpoints with Tambo Cloud
+---
+
+Tambo Cloud supports multiple agent frameworks out of the box. When using a custom Agent URL, your endpoint must implement the AGUI protocol for proper integration.
+
+## Supported Providers
+
+### LlamaIndex
+
+LlamaIndex is a framework for building context-augmented LLM applications. When using LlamaIndex as your agent provider, you can host your own agent endpoint.
+
+[Learn how to configure LlamaIndex →](/guides/agent-providers/llamaindex)
+
+### CrewAI
+
+CrewAI enables building multi-agent AI systems with role-based collaboration. Coming soon.
+
+### Mastra
+
+Mastra provides workflow orchestration for AI agents. Coming soon.
+
+### PydanticAI
+
+Type-safe agent framework built on Pydantic. Coming soon.
+
+## Protocol Overview
+
+All custom agent providers must return Server-Sent Events (SSE) that conform to the AGUI protocol. This protocol defines:
+
+- Text message streaming (`TEXT_MESSAGE_START`, `TEXT_MESSAGE_CONTENT`, `TEXT_MESSAGE_END`)
+- Tool call execution (`TOOL_CALL_START`, `TOOL_CALL_ARGS`, `TOOL_CALL_END`, `TOOL_CALL_RESULT`)
+- Thinking/reasoning steps (`THINKING_START`, `THINKING_TEXT_MESSAGE_CONTENT`, `THINKING_END`)
+- State management (`STATE_SNAPSHOT`, `STATE_DELTA`, `MESSAGES_SNAPSHOT`)
+- Run lifecycle (`RUN_STARTED`, `RUN_FINISHED`, `RUN_ERROR`)
+
+## Quick Start
+
+1. **Configure your project** - Select your agent provider in Tambo Cloud project settings
+2. **Set the Agent URL** - Point to your custom endpoint
+3. **Add headers** - Include any authentication tokens or API keys
+4. **Implement the protocol** - Return SSE events matching the AGUI format
+5. **Test** - Send a message and verify events stream correctly
+
+## Common Use Cases
+
+### Custom LLM Routing
+
+Route requests to different models based on complexity, cost, or capabilities.
+
+### Multi-Agent Systems
+
+Orchestrate multiple specialized agents with CrewAI or custom coordination logic.
+
+### RAG Pipelines
+
+Integrate vector databases, document retrievers, and reranking using LlamaIndex.
+
+### Workflow Automation
+
+Chain together multiple AI operations with state persistence using Mastra.
+
+## Troubleshooting
+
+### INTERNAL_ERROR
+
+This error indicates your endpoint returned an invalid SSE stream. Common causes:
+
+- Malformed JSON in `data:` lines
+- Missing or unknown `type` field
+- Incomplete event sequences (started but not closed)
+- Wrong Content-Type header (must be `text/event-stream`)
+
+See the provider-specific guides for detailed troubleshooting steps.
+
+## Next Steps
+
+- [Configure LlamaIndex provider](/guides/agent-providers/llamaindex)
+- [Learn about agent configuration](/concepts/agent-configuration)
+- [Explore tool registration](/guides/take-actions/register-tools)
