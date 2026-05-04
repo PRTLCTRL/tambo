@@ -118,7 +118,12 @@ Stream assistant responses character-by-character or in chunks:
 Or use the chunk variant (which auto-starts/ends):
 
 ```json
-{"type":"TEXT_MESSAGE_CHUNK","messageId":"msg-4","delta":"Hello","role":"assistant"}
+{
+  "type": "TEXT_MESSAGE_CHUNK",
+  "messageId": "msg-4",
+  "delta": "Hello",
+  "role": "assistant"
+}
 ```
 
 #### Tool Calls
@@ -135,13 +140,24 @@ When the AI wants to call a tool:
 Or use chunks:
 
 ```json
-{"type":"TOOL_CALL_CHUNK","toolCallId":"call-5","toolCallName":"get_weather","delta":"{\"location\":\"New York\"}","parentMessageId":"msg-4"}
+{
+  "type": "TOOL_CALL_CHUNK",
+  "toolCallId": "call-5",
+  "toolCallName": "get_weather",
+  "delta": "{\"location\":\"New York\"}",
+  "parentMessageId": "msg-4"
+}
 ```
 
 After your server executes the tool, return the result:
 
 ```json
-{"type":"TOOL_CALL_RESULT","toolCallId":"call-5","messageId":"tool-msg-1","content":"{\"temperature\":72,\"condition\":\"sunny\"}"}
+{
+  "type": "TOOL_CALL_RESULT",
+  "toolCallId": "call-5",
+  "messageId": "tool-msg-1",
+  "content": "{\"temperature\":72,\"condition\":\"sunny\"}"
+}
 ```
 
 #### Thinking (Extended Thinking / Reasoning)
@@ -169,7 +185,11 @@ Every run should start and end with these events:
 Or if an error occurs:
 
 ```json
-{"type":"RUN_ERROR","message":"Something went wrong","code":"INTERNAL_ERROR"}
+{
+  "type": "RUN_ERROR",
+  "message": "Something went wrong",
+  "code": "INTERNAL_ERROR"
+}
 ```
 
 #### State Updates
@@ -177,13 +197,16 @@ Or if an error occurs:
 For stateful agents that need to persist data:
 
 ```json
-{"type":"STATE_SNAPSHOT","snapshot":{"key":"value"}}
+{ "type": "STATE_SNAPSHOT", "snapshot": { "key": "value" } }
 ```
 
 Or incremental updates using JSON Patch:
 
 ```json
-{"type":"STATE_DELTA","delta":[{"op":"add","path":"/newKey","value":"newValue"}]}
+{
+  "type": "STATE_DELTA",
+  "delta": [{ "op": "add", "path": "/newKey", "value": "newValue" }]
+}
 ```
 
 #### Messages Snapshot
@@ -191,7 +214,10 @@ Or incremental updates using JSON Patch:
 To replace the entire message history:
 
 ```json
-{"type":"MESSAGES_SNAPSHOT","messages":[{"id":"msg-1","role":"user","content":"Hello"}]}
+{
+  "type": "MESSAGES_SNAPSHOT",
+  "messages": [{ "id": "msg-1", "role": "user", "content": "Hello" }]
+}
 ```
 
 ## Minimal Working Example
@@ -270,22 +296,22 @@ async def run_agent(request: dict):
     async def generate():
         # Start the run
         yield f"data: {json.dumps({'type': 'RUN_STARTED'})}\n\n"
-        
+
         # Start assistant message
         msg_id = "response-1"
         yield f"data: {json.dumps({'type': 'TEXT_MESSAGE_START', 'messageId': msg_id, 'role': 'assistant'})}\n\n"
-        
+
         # Stream content
         response_text = "Hello from LlamaIndex!"
         for char in response_text:
             yield f"data: {json.dumps({'type': 'TEXT_MESSAGE_CONTENT', 'messageId': msg_id, 'delta': char})}\n\n"
-        
+
         # End message
         yield f"data: {json.dumps({'type': 'TEXT_MESSAGE_END', 'messageId': msg_id})}\n\n"
-        
+
         # Finish run
         yield f"data: {json.dumps({'type': 'RUN_FINISHED', 'result': 'Success'})}\n\n"
-    
+
     return StreamingResponse(generate(), media_type="text/event-stream")
 ```
 
