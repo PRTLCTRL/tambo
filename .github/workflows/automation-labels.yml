@@ -417,9 +417,12 @@ jobs:
           fi
 
           if [[ ${#CMD_ARGS[@]} -gt 0 ]]; then
+            set +e
             RESULT=$(gh "${GH_SUBCOMMAND}" edit "${PR_OR_ISSUE_NUMBER}" -R "${GH_REPO}" "${CMD_ARGS[@]}" 2>&1)
-            if [[ $? -ne 0 ]]; then
-              echo "::error title=Failed to sync labels::Failed to sync labels. Error: ${RESULT}"
+            EXIT_CODE=$?
+            set -e
+            if [[ $EXIT_CODE -ne 0 ]]; then
+              echo "::warning title=Failed to sync labels::Failed to sync labels. This may occur if the labels don't exist in the repository yet. Error: ${RESULT}"
             fi
           else
             echo "No label changes to apply"
