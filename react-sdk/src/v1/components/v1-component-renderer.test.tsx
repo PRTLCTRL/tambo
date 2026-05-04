@@ -1,10 +1,13 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { z } from "zod";
 import { ComponentRenderer } from "./v1-component-renderer";
 import { TamboRegistryContext } from "../../providers/tambo-registry-provider";
 import type { TamboRegistryContext as TamboRegistryContextType } from "../../providers/tambo-registry-provider";
 import type { TamboComponentContent } from "../types/message";
+import { TamboConfigContext } from "../providers/tambo-v1-provider";
+import { TamboInteractableProvider } from "../../providers/tambo-interactable-provider";
+import { useTamboInteractable } from "../../providers/tambo-interactable-provider";
 
 // Simple test component
 const TestComponent: React.FC<{ title: string; count?: number }> = ({
@@ -411,5 +414,230 @@ describe("ComponentRenderer", () => {
     );
 
     expect(screen.getByTestId("context-aware")).toBeInTheDocument();
+  });
+
+  describe("autoInteractables", () => {
+    const InteractableTestComponent: React.FC<{
+      title: string;
+      count: number;
+    }> = ({ title, count }) => (
+      <div data-testid="interactable-component">
+        <span data-testid="title">{title}</span>
+        <span data-testid="count">{count}</span>
+      </div>
+    );
+
+    const interactableSchema = z.object({
+      title: z.string(),
+      count: z.number(),
+    });
+
+    it("does not add component to interactables when autoInteractables is disabled", async () => {
+      const registry = createMockRegistry({
+        InteractableTest: {
+          name: "InteractableTest",
+          description: "Test component",
+          component: InteractableTestComponent,
+          propsSchema: interactableSchema,
+          props: { type: "object" },
+          contextTools: [],
+        },
+      });
+
+      const content: TamboComponentContent = {
+        type: "component",
+        id: "comp_auto_123",
+        name: "InteractableTest",
+        props: { title: "Test", count: 5 },
+        streamingState: "done",
+      };
+
+      const InteractablesTracker = () => {
+        const { interactableComponents } = useTamboInteractable();
+        return (
+          <div data-testid="interactables-count">
+            {interactableComponents.length}
+          </div>
+        );
+      };
+
+      render(
+        <TamboConfigContext.Provider value={{ autoInteractables: false }}>
+          <TamboRegistryContext.Provider value={registry}>
+            <TamboInteractableProvider>
+              <ComponentRenderer
+                content={content}
+                threadId="thread_123"
+                messageId="msg_456"
+              />
+              <InteractablesTracker />
+            </TamboInteractableProvider>
+          </TamboRegistryContext.Provider>
+        </TamboConfigContext.Provider>,
+      );
+
+      expect(screen.getByTestId("interactable-component")).toBeInTheDocument();
+      expect(screen.getByTestId("interactables-count")).toHaveTextContent("0");
+    });
+
+    it("adds component to interactables when autoInteractables is enabled", async () => {
+      const registry = createMockRegistry({
+        InteractableTest: {
+          name: "InteractableTest",
+          description: "Test component",
+          component: InteractableTestComponent,
+          propsSchema: interactableSchema,
+          props: { type: "object" },
+          contextTools: [],
+        },
+      });
+
+      const content: TamboComponentContent = {
+        type: "component",
+        id: "comp_auto_456",
+        name: "InteractableTest",
+        props: { title: "Auto Added", count: 10 },
+        streamingState: "done",
+      };
+
+      const InteractablesTracker = () => {
+        const { interactableComponents } = useTamboInteractable();
+        return (
+          <div data-testid="interactables-count">
+            {interactableComponents.length}
+          </div>
+        );
+      };
+
+      render(
+        <TamboConfigContext.Provider value={{ autoInteractables: true }}>
+          <TamboRegistryContext.Provider value={registry}>
+            <TamboInteractableProvider>
+              <ComponentRenderer
+                content={content}
+                threadId="thread_123"
+                messageId="msg_456"
+              />
+              <InteractablesTracker />
+            </TamboInteractableProvider>
+          </TamboRegistryContext.Provider>
+        </TamboConfigContext.Provider>,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId("interactables-count")).toHaveTextContent(
+          "1",
+        );
+      });
+    });
+
+    it("does not add component to interactables while streaming", async () => {
+      const registry = createMockRegistry({
+        InteractableTest: {
+          name: "InteractableTest",
+          description: "Test component",
+          component: InteractableTestComponent,
+          propsSchema: interactableSchema,
+          props: { type: "object" },
+          contextTools: [],
+        },
+      });
+
+      const content: TamboComponentContent = {
+        type: "component",
+        id: "comp_streaming_789",
+        name: "InteractableTest",
+        props: { title: "Streaming", count: 3 },
+        streamingState: "streaming",
+      };
+
+      const InteractablesTracker = () => {
+        const { interactableComponents } = useTamboInteractable();
+        return (
+          <div data-testid="interactables-count">
+            {interactableComponents.length}
+          </div>
+        );
+      };
+
+      render(
+        <TamboConfigContext.Provider value={{ autoInteractables: true }}>
+          <TamboRegistryContext.Provider value={registry}>
+            <TamboInteractableProvider>
+              <ComponentRenderer
+                content={content}
+                threadId="thread_123"
+                messageId="msg_456"
+              />
+              <InteractablesTracker />
+            </TamboInteractableProvider>
+          </TamboRegistryContext.Provider>
+        </TamboConfigContext.Provider>,
+      );
+
+      expect(screen.getByTestId("interactables-count")).toHaveTextContent("0");
+    });
+
+    it("does not add component twice if already exists in interactables", async () => {
+      const registry = createMockRegistry({
+        InteractableTest: {
+          name: "InteractableTest",
+          description: "Test component",
+          component: InteractableTestComponent,
+          propsSchema: interactableSchema,
+          props: { type: "object" },
+          contextTools: [],
+        },
+      });
+
+      const content: TamboComponentContent = {
+        type: "component",
+        id: "comp_duplicate_999",
+        name: "InteractableTest",
+        props: { title: "Duplicate", count: 7 },
+        streamingState: "done",
+      };
+
+      const InteractablesTracker = () => {
+        const { interactableComponents, addInteractableComponent } =
+          useTamboInteractable();
+
+        React.useEffect(() => {
+          addInteractableComponent({
+            name: "InteractableTest",
+            description: "Pre-existing",
+            props: { title: "Pre-existing", count: 1 },
+            propsSchema: interactableSchema,
+          });
+        }, []);
+
+        return (
+          <div data-testid="interactables-count">
+            {interactableComponents.length}
+          </div>
+        );
+      };
+
+      render(
+        <TamboConfigContext.Provider value={{ autoInteractables: true }}>
+          <TamboRegistryContext.Provider value={registry}>
+            <TamboInteractableProvider>
+              <InteractablesTracker />
+              <ComponentRenderer
+                content={content}
+                threadId="thread_123"
+                messageId="msg_456"
+              />
+            </TamboInteractableProvider>
+          </TamboRegistryContext.Provider>
+        </TamboConfigContext.Provider>,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId("interactables-count")).toHaveTextContent(
+          "1",
+        );
+      });
+    });
   });
 });
