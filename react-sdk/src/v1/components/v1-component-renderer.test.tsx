@@ -80,6 +80,17 @@ describe("ComponentRenderer", () => {
     streamingState: "done",
   };
 
+  const TestWrapper: React.FC<{
+    children: React.ReactNode;
+    registry: TamboRegistryContextType;
+  }> = ({ children, registry }) => (
+    <TamboConfigContext.Provider value={{ autoInteractables: false }}>
+      <TamboRegistryContext.Provider value={registry}>
+        {children}
+      </TamboRegistryContext.Provider>
+    </TamboConfigContext.Provider>
+  );
+
   it("renders component from registry with props", () => {
     const registry = createMockRegistry({
       TestComponent: {
@@ -92,13 +103,13 @@ describe("ComponentRenderer", () => {
     });
 
     render(
-      <TamboRegistryContext.Provider value={registry}>
+      <TestWrapper registry={registry}>
         <ComponentRenderer
           content={baseContent}
           threadId="thread_123"
           messageId="msg_456"
         />
-      </TamboRegistryContext.Provider>,
+      </TestWrapper>,
     );
 
     expect(screen.getByTestId("test-component")).toBeInTheDocument();
@@ -110,14 +121,14 @@ describe("ComponentRenderer", () => {
 
     withMockedConsoleError((consoleErrorSpy) => {
       render(
-        <TamboRegistryContext.Provider value={registry}>
+        <TestWrapper registry={registry}>
           <ComponentRenderer
             content={baseContent}
             threadId="thread_123"
             messageId="msg_456"
             fallback={<div data-testid="fallback">Not found</div>}
           />
-        </TamboRegistryContext.Provider>,
+        </TestWrapper>,
       );
 
       expect(screen.getByTestId("fallback")).toBeInTheDocument();
@@ -138,13 +149,13 @@ describe("ComponentRenderer", () => {
 
     withMockedConsoleError((consoleErrorSpy) => {
       const { container } = render(
-        <TamboRegistryContext.Provider value={registry}>
+        <TestWrapper registry={registry}>
           <ComponentRenderer
             content={baseContent}
             threadId="thread_123"
             messageId="msg_456"
           />
-        </TamboRegistryContext.Provider>,
+        </TestWrapper>,
       );
 
       expect(container.firstChild).toBeNull();
@@ -179,13 +190,13 @@ describe("ComponentRenderer", () => {
     };
 
     render(
-      <TamboRegistryContext.Provider value={registry}>
+      <TestWrapper registry={registry}>
         <ComponentRenderer
           content={content}
           threadId="thread_123"
           messageId="msg_456"
         />
-      </TamboRegistryContext.Provider>,
+      </TestWrapper>,
     );
 
     expect(screen.getByTestId("title")).toHaveTextContent("Test");
@@ -212,13 +223,13 @@ describe("ComponentRenderer", () => {
     };
 
     render(
-      <TamboRegistryContext.Provider value={registry}>
+      <TestWrapper registry={registry}>
         <ComponentRenderer
           content={content}
           threadId="thread_123"
           messageId="msg_456"
         />
-      </TamboRegistryContext.Provider>,
+      </TestWrapper>,
     );
 
     // Component should render with empty props
@@ -246,13 +257,13 @@ describe("ComponentRenderer", () => {
     };
 
     render(
-      <TamboRegistryContext.Provider value={registry}>
+      <TestWrapper registry={registry}>
         <ComponentRenderer
           content={content}
           threadId="thread_123"
           messageId="msg_456"
         />
-      </TamboRegistryContext.Provider>,
+      </TestWrapper>,
     );
 
     expect(screen.getByTestId("name")).toHaveTextContent("Alice");
@@ -282,13 +293,13 @@ describe("ComponentRenderer", () => {
     };
 
     render(
-      <TamboRegistryContext.Provider value={registry}>
+      <TestWrapper registry={registry}>
         <ComponentRenderer
           content={content}
           threadId="thread_123"
           messageId="msg_456"
         />
-      </TamboRegistryContext.Provider>,
+      </TestWrapper>,
     );
 
     // Should still render with raw props
@@ -328,13 +339,13 @@ describe("ComponentRenderer", () => {
     });
 
     render(
-      <TamboRegistryContext.Provider value={registry}>
+      <TestWrapper registry={registry}>
         <ComponentRenderer
           content={baseContent}
           threadId="thread_123"
           messageId="msg_456"
         />
-      </TamboRegistryContext.Provider>,
+      </TestWrapper>,
     );
 
     expect(consoleSpy).toHaveBeenCalledWith(
@@ -365,13 +376,13 @@ describe("ComponentRenderer", () => {
     };
 
     render(
-      <TamboRegistryContext.Provider value={registry}>
+      <TestWrapper registry={registry}>
         <ComponentRenderer
           content={content}
           threadId="thread_123"
           messageId="msg_456"
         />
-      </TamboRegistryContext.Provider>,
+      </TestWrapper>,
     );
 
     expect(screen.getByTestId("title")).toHaveTextContent("Partial");
@@ -404,13 +415,13 @@ describe("ComponentRenderer", () => {
     };
 
     render(
-      <TamboRegistryContext.Provider value={registry}>
+      <TestWrapper registry={registry}>
         <ComponentRenderer
           content={content}
           threadId="thread_abc"
           messageId="msg_def"
         />
-      </TamboRegistryContext.Provider>,
+      </TestWrapper>,
     );
 
     expect(screen.getByTestId("context-aware")).toBeInTheDocument();
@@ -438,7 +449,6 @@ describe("ComponentRenderer", () => {
           name: "InteractableTest",
           description: "Test component",
           component: InteractableTestComponent,
-          propsSchema: interactableSchema,
           props: { type: "object" },
           contextTools: [],
         },
@@ -486,7 +496,6 @@ describe("ComponentRenderer", () => {
           name: "InteractableTest",
           description: "Test component",
           component: InteractableTestComponent,
-          propsSchema: interactableSchema,
           props: { type: "object" },
           contextTools: [],
         },
@@ -537,7 +546,6 @@ describe("ComponentRenderer", () => {
           name: "InteractableTest",
           description: "Test component",
           component: InteractableTestComponent,
-          propsSchema: interactableSchema,
           props: { type: "object" },
           contextTools: [],
         },
@@ -584,7 +592,6 @@ describe("ComponentRenderer", () => {
           name: "InteractableTest",
           description: "Test component",
           component: InteractableTestComponent,
-          propsSchema: interactableSchema,
           props: { type: "object" },
           contextTools: [],
         },
@@ -605,10 +612,12 @@ describe("ComponentRenderer", () => {
         React.useEffect(() => {
           addInteractableComponent({
             name: "InteractableTest",
+            component: () => <div>Test</div>,
             description: "Pre-existing",
             props: { title: "Pre-existing", count: 1 },
             propsSchema: interactableSchema,
           });
+          // eslint-disable-next-line react-hooks/exhaustive-deps
         }, []);
 
         return (

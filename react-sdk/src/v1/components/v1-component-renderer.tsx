@@ -173,11 +173,10 @@ export const ComponentRenderer: FC<ComponentRendererProps> = ({
     try {
       addInteractableComponent({
         name: content.name,
+        component: registeredComponent.component,
         description:
           registeredComponent.description ?? `Component: ${content.name}`,
-        props: content.props ?? {},
-        propsSchema: registeredComponent.propsSchema,
-        annotations: registeredComponent.annotations,
+        props: (content.props ?? {}) as Record<string, unknown>,
       });
       addedToInteractablesRef.current = true;
     } catch (error) {
