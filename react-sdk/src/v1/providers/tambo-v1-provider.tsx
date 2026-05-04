@@ -46,6 +46,7 @@ import type {
 import type { InitialInputMessage } from "../types/message";
 import { TamboStreamProvider } from "./tambo-v1-stream-context";
 import { TamboThreadInputProvider } from "./tambo-v1-thread-input-provider";
+import { AutoInteractablesManager } from "./auto-interactables-manager";
 
 /**
  * Configuration values for the SDK.
@@ -63,6 +64,8 @@ export interface TamboConfig {
    * These are displayed in the UI immediately and sent to the API on first message.
    */
   initialMessages?: InitialInputMessage[];
+  /** When true, automatically adds all AI-generated components to the interactables system. Defaults to false. */
+  autoAddInteractables?: boolean;
 }
 
 /**
@@ -173,6 +176,13 @@ export interface TamboProviderProps extends Pick<
   initialMessages?: InitialInputMessage[];
 
   /**
+   * When true, automatically adds all AI-generated components to the interactables system.
+   * This allows the AI to update previously-generated components without needing to know
+   * ahead of time which components will be created. Defaults to false.
+   */
+  autoAddInteractables?: boolean;
+
+  /**
    * Children components
    */
   children: React.ReactNode;
@@ -238,6 +248,7 @@ function TamboAuthWarnings(): null {
  * @param props.autoGenerateThreadName - Whether to automatically generate thread names. Defaults to true.
  * @param props.autoGenerateNameThreshold - The message count threshold at which the thread name will be auto-generated. Defaults to 3.
  * @param props.initialMessages - Optional initial messages to prepend to the first thread.
+ * @param props.autoAddInteractables - When true, automatically adds all AI-generated components to the interactables system. Defaults to false.
  * @param props.children - Child components
  * @returns Provider component tree
  * @example
@@ -274,6 +285,7 @@ export function TamboProvider({
   autoGenerateThreadName,
   autoGenerateNameThreshold,
   initialMessages,
+  autoAddInteractables,
   children,
 }: PropsWithChildren<TamboProviderProps>) {
   // Config is static - created once and never changes
@@ -282,6 +294,7 @@ export function TamboProvider({
     autoGenerateThreadName,
     autoGenerateNameThreshold,
     initialMessages,
+    autoAddInteractables,
   };
 
   return (
@@ -309,6 +322,7 @@ export function TamboProvider({
                   <TamboConfigContext.Provider value={config}>
                     <TamboAuthWarnings />
                     <TamboStreamProvider initialMessages={initialMessages}>
+                      <AutoInteractablesManager />
                       <TamboThreadInputProvider>
                         {children}
                       </TamboThreadInputProvider>
