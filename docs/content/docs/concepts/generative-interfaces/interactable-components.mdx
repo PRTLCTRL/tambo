@@ -37,6 +37,33 @@ When you wrap a component with `withTamboInteractable`, Tambo creates an automat
 
 Place these wherever you normally would within the application to enable a traditional, statically-organized, user interface enhanced with AI capabilities.
 
+## Automatic Interactables
+
+For scenarios where you want all AI-generated components to be automatically updateable without manual wrapping, you can enable the `autoAddToInteractables` option on `TamboProvider`. This is particularly useful when building chat interfaces where you want to display a history of generated components and allow users to update them through conversation.
+
+```tsx
+<TamboProvider
+  apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
+  components={[WeatherCard, RecipeCard]}
+  autoAddToInteractables={true}
+>
+  <ChatInterface />
+</TamboProvider>
+```
+
+When enabled, every component that Tambo generates gets automatically added to the interactables registry once streaming completes. This means users can ask questions like:
+
+- "Update the weather card to show tomorrow's forecast"
+- "Change the recipe serving size to 4"
+- "Make the background color darker"
+
+The AI automatically receives context about all previously-generated components and can update them without requiring you to manually wrap them with `withTamboInteractable`.
+
+This feature is particularly useful for:
+- Chat interfaces that show generated component history
+- Applications where users naturally iterate on AI-generated UI
+- Prototyping tools where rapid UI modifications are common
+
 <LearnMore
   title="How to register Interactable components"
   description="Step-by-step guide to making your components Interactable"
