@@ -32,6 +32,11 @@ import {
   type StreamState,
 } from "@tambo-ai/client";
 import { useTamboConfig } from "./tambo-v1-provider";
+import {
+  useAutoAddEnabled,
+  useTamboInteractable,
+} from "../../providers/tambo-interactable-provider";
+import { useTamboRegistry } from "../../providers/tambo-registry-provider";
 
 /**
  * Thread management functions exposed by the stream context.
@@ -232,6 +237,7 @@ export function TamboStreamProvider(props: TamboStreamProviderProps) {
       <StreamDispatchContext.Provider value={activeDispatch}>
         <ThreadManagementContext.Provider value={threadManagement}>
           <ThreadSyncManager />
+          <AutoAddComponentsWatcher />
           {children}
         </ThreadManagementContext.Provider>
       </StreamDispatchContext.Provider>
@@ -410,4 +416,75 @@ export function useThreadManagement(): ThreadManagement {
   }
 
   return context;
+}
+
+/**
+ * Internal component that watches for new component messages and automatically
+ * adds them to the interactables registry when auto-add is enabled.
+ * Must be a child of both TamboStreamProvider and TamboInteractableProvider.
+ * @internal
+ * @returns null - this component renders nothing
+ */
+function AutoAddComponentsWatcher(): null {
+  const state = useStreamState();
+  const autoAddEnabled = useAutoAddEnabled();
+  const { addInteractableComponent, getInteractableComponentsByName } =
+    useTamboInteractable();
+  const { componentList } = useTamboRegistry();
+
+  const processedComponentsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!autoAddEnabled) return;
+
+    const currentThread = state.threadMap[state.currentThreadId];
+    if (!currentThread) return;
+
+    for (const message of currentThread.thread.messages) {
+      if (message.role !== "assistant") continue;
+
+      for (const content of message.content) {
+        if (content.type !== "component") continue;
+
+        const uniqueKey = `${message.id}-${content.id}`;
+        if (processedComponentsRef.current.has(uniqueKey)) continue;
+
+        const registeredComponent = componentList[content.name];
+        if (!registeredComponent) continue;
+
+        const existingInteractables = getInteractableComponentsByName(
+          content.name,
+        );
+        const alreadyExists = existingInteractables.some(
+          (ic) =>
+            ic.props &&
+            content.props &&
+            JSON.stringify(ic.props) === JSON.stringify(content.props),
+        );
+
+        if (!alreadyExists) {
+          addInteractableComponent({
+            name: content.name,
+            description:
+              registeredComponent.description ??
+              `Interactable ${content.name} component`,
+            component: registeredComponent.component,
+            props: (content.props ?? {}) as Record<string, unknown>,
+            propsSchema: registeredComponent.props,
+            state: (content.state ?? {}) as Record<string, unknown>,
+          });
+        }
+
+        processedComponentsRef.current.add(uniqueKey);
+      }
+    }
+  }, [
+    autoAddEnabled,
+    state,
+    addInteractableComponent,
+    getInteractableComponentsByName,
+    componentList,
+  ]);
+
+  return null;
 }
