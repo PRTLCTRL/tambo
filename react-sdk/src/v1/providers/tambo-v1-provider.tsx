@@ -63,6 +63,13 @@ export interface TamboConfig {
    * These are displayed in the UI immediately and sent to the API on first message.
    */
   initialMessages?: InitialInputMessage[];
+  /**
+   * Whether to automatically register generated components as interactables.
+   * When enabled, any component rendered by the AI will automatically be added
+   * to the interactables registry, allowing it to be updated via AI interactions.
+   * Defaults to false.
+   */
+  autoRegisterGeneratedComponentsAsInteractables?: boolean;
 }
 
 /**
@@ -173,6 +180,14 @@ export interface TamboProviderProps extends Pick<
   initialMessages?: InitialInputMessage[];
 
   /**
+   * Whether to automatically register generated components as interactables.
+   * When enabled, any component rendered by the AI will automatically be added
+   * to the interactables registry, allowing it to be updated via AI interactions.
+   * Defaults to false.
+   */
+  autoRegisterGeneratedComponentsAsInteractables?: boolean;
+
+  /**
    * Children components
    */
   children: React.ReactNode;
@@ -238,6 +253,7 @@ function TamboAuthWarnings(): null {
  * @param props.autoGenerateThreadName - Whether to automatically generate thread names. Defaults to true.
  * @param props.autoGenerateNameThreshold - The message count threshold at which the thread name will be auto-generated. Defaults to 3.
  * @param props.initialMessages - Optional initial messages to prepend to the first thread.
+ * @param props.autoRegisterGeneratedComponentsAsInteractables - Whether to automatically register generated components as interactables. Defaults to false.
  * @param props.children - Child components
  * @returns Provider component tree
  * @example
@@ -274,6 +290,7 @@ export function TamboProvider({
   autoGenerateThreadName,
   autoGenerateNameThreshold,
   initialMessages,
+  autoRegisterGeneratedComponentsAsInteractables,
   children,
 }: PropsWithChildren<TamboProviderProps>) {
   // Config is static - created once and never changes
@@ -282,6 +299,7 @@ export function TamboProvider({
     autoGenerateThreadName,
     autoGenerateNameThreshold,
     initialMessages,
+    autoRegisterGeneratedComponentsAsInteractables,
   };
 
   return (
