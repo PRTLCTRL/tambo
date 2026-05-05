@@ -88,31 +88,34 @@ export const ComponentRenderer: FC<ComponentRendererProps> = ({
       return;
     }
 
-    // Check if component is already registered
-    const existingInteractables = getInteractableComponentsByName(content.name);
-    const alreadyRegistered = existingInteractables.some(
-      (interactable) => interactable.id === content.id,
-    );
-
-    if (alreadyRegistered) {
-      return;
-    }
-
     try {
       const registeredComponent = getComponentFromRegistry(
         content.name,
         registry.componentList,
       );
 
-      // Add to interactables with the content ID as the component ID base
-      addInteractableComponent({
-        name: content.name,
-        description:
-          registeredComponent.description || `Generated ${content.name}`,
-        component: registeredComponent.component,
-        props: content.props ?? {},
-        propsSchema: registeredComponent.props,
-      });
+      // Check if we already have an interactable for this component name
+      const existingInteractables = getInteractableComponentsByName(content.name);
+
+      // Parse props (same logic as rendering)
+      const propsJson = JSON.stringify(content.props ?? {});
+      const parsedProps = parse(propsJson);
+
+      if (existingInteractables.length > 0) {
+        // Update the first existing interactable with new props
+        const existing = existingInteractables[0];
+        updateInteractableComponentProps(existing.id, parsedProps);
+      } else {
+        // Add new interactable
+        addInteractableComponent({
+          name: content.name,
+          description:
+            registeredComponent.description || `Generated ${content.name}`,
+          component: registeredComponent.component,
+          props: parsedProps,
+          propsSchema: registeredComponent.props,
+        });
+      }
     } catch (error) {
       console.warn(
         `[ComponentRenderer] Failed to auto-register interactable for ${content.name}:`,
@@ -126,6 +129,7 @@ export const ComponentRenderer: FC<ComponentRendererProps> = ({
     content.props,
     registry.componentList,
     addInteractableComponent,
+    updateInteractableComponentProps,
     getInteractableComponentsByName,
   ]);
 

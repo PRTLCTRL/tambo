@@ -164,13 +164,20 @@ describe("ComponentRenderer - Auto-register Interactables", () => {
     expect(screen.getByTestId("interactable-name")).toHaveTextContent("TestCard");
   });
 
-  it("should not duplicate interactables for the same component", async () => {
+  it("should update existing interactable when rendering same component name again", async () => {
     const mockRegistry = createMockRegistry();
-    const content: TamboComponentContent = {
+    const content1: TamboComponentContent = {
       type: "component",
-      id: "comp-3",
+      id: "comp-3a",
       name: "TestCard",
-      props: { title: "Test" },
+      props: { title: "First" },
+      streamingState: "complete",
+    };
+    const content2: TamboComponentContent = {
+      type: "component",
+      id: "comp-3b",
+      name: "TestCard",
+      props: { title: "Updated" },
       streamingState: "complete",
     };
 
@@ -181,15 +188,15 @@ describe("ComponentRenderer - Auto-register Interactables", () => {
       return (
         <div>
           <ComponentRenderer
-            content={content}
+            content={content1}
             threadId="thread-1"
             messageId="msg-1"
           />
           {showSecond && (
             <ComponentRenderer
-              content={content}
+              content={content2}
               threadId="thread-1"
-              messageId="msg-1"
+              messageId="msg-2"
             />
           )}
           <button
@@ -201,6 +208,11 @@ describe("ComponentRenderer - Auto-register Interactables", () => {
           <div data-testid="interactable-count">
             {interactableComponents.length}
           </div>
+          {interactableComponents.length > 0 && (
+            <div data-testid="interactable-props">
+              {JSON.stringify(interactableComponents[0].props)}
+            </div>
+          )}
         </div>
       );
     }
@@ -222,14 +234,25 @@ describe("ComponentRenderer - Auto-register Interactables", () => {
       expect(getByTestId("interactable-count")).toHaveTextContent("1");
     });
 
-    // Show second renderer with same content
+    // Check initial props
+    expect(getByTestId("interactable-props")).toHaveTextContent(
+      JSON.stringify({ title: "First" }),
+    );
+
+    // Show second renderer with same component name but different props
     act(() => {
       getByTestId("show-second").click();
     });
 
-    // Should still only have 1 interactable
+    // Should still only have 1 interactable, but with updated props
     await waitFor(() => {
       expect(getByTestId("interactable-count")).toHaveTextContent("1");
+    });
+
+    await waitFor(() => {
+      expect(getByTestId("interactable-props")).toHaveTextContent(
+        JSON.stringify({ title: "Updated" }),
+      );
     });
   });
 
