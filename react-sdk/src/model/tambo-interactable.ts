@@ -60,4 +60,6 @@ export interface TamboInteractableContext {
   setInteractableSelected: (componentId: string, isSelected: boolean) => void;
   /** Clear all interactable component selections */
   clearInteractableSelections: () => void;
+  /** Whether generated components should be automatically added to the interactables list */
+  autoAddToInteractables: boolean;
 }

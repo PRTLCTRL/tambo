@@ -13,8 +13,9 @@
  */
 
 import { parse } from "partial-json";
-import React, { type FC, useMemo, useContext } from "react";
+import React, { type FC, useMemo, useContext, useEffect, useRef } from "react";
 import { TamboRegistryContext } from "../../providers/tambo-registry-provider";
+import { useTamboInteractable } from "../../providers/tambo-interactable-provider";
 import { isStandardSchema } from "../../schema";
 import { isPromise } from "../../util/is-promise";
 import { getComponentFromRegistry } from "../../util/registry";
@@ -76,6 +77,12 @@ export const ComponentRenderer: FC<ComponentRendererProps> = ({
   fallback = null,
 }) => {
   const registry = useContext(TamboRegistryContext);
+  const {
+    addInteractableComponent,
+    autoAddToInteractables,
+    getInteractableComponentsByName,
+  } = useTamboInteractable();
+  const hasAddedToInteractables = useRef(false);
 
   // Memoize the rendered element - only recreates when props change
   const element = useMemo(() => {
@@ -135,6 +142,52 @@ export const ComponentRenderer: FC<ComponentRendererProps> = ({
     content.streamingState,
     messageId,
     threadId,
+    registry.componentList,
+  ]);
+
+  // Auto-add to interactables if enabled and not already added
+  useEffect(() => {
+    if (
+      autoAddToInteractables &&
+      !hasAddedToInteractables.current &&
+      element !== null
+    ) {
+      try {
+        const registeredComponent = getComponentFromRegistry(
+          content.name,
+          registry.componentList,
+        );
+
+        addInteractableComponent({
+          name: content.name,
+          description: registeredComponent.name,
+          component: registeredComponent.component,
+          props: content.props ?? {},
+          propsSchema: registeredComponent.props,
+          state: content.state ?? {},
+        });
+
+        hasAddedToInteractables.current = true;
+      } catch (error) {
+        console.error(
+          "[ComponentRenderer] Failed to auto-add component to interactables",
+          {
+            componentId: content.id,
+            componentName: content.name,
+            error,
+          },
+        );
+      }
+    }
+  }, [
+    autoAddToInteractables,
+    content.id,
+    content.name,
+    content.props,
+    content.state,
+    element,
+    addInteractableComponent,
+    getInteractableComponentsByName,
     registry.componentList,
   ]);
 
