@@ -384,7 +384,7 @@ function EditableCard({ title: initialTitle }: { title: string }) {
 
 ## useTamboStreamStatus
 
-Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity.
+Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity, including support for nested objects and arrays.
 
 **Important**: Props update repeatedly during streaming and may be partial. Use `propStatus.<field>?.isSuccess` before treating a prop as complete.
 
@@ -418,6 +418,77 @@ function MyComponent(props: MyProps) {
   This hook only works inside components rendered via `ComponentRenderer`. The
   renderer provides the necessary context for tracking streaming state.
 </Callout>
+
+### Nested Object Support
+
+For props with nested objects, `propStatus` contains nested status objects that track the streaming state of each nested field:
+
+```tsx
+interface UserCardProps {
+  user: {
+    name: string;
+    email: string;
+    profile: {
+      bio: string;
+    };
+  };
+}
+
+function UserCard(props: UserCardProps) {
+  const { propStatus } = useTamboStreamStatus<UserCardProps>();
+
+  // Access nested field status
+  const userStatus = propStatus.user as PropStatus & {
+    name?: PropStatus;
+    email?: PropStatus;
+    profile?: PropStatus & { bio?: PropStatus };
+  };
+
+  return (
+    <div>
+      <h3 className={userStatus.name?.isStreaming ? "animate-pulse" : ""}>
+        {props.user.name}
+      </h3>
+      <p className={userStatus.email?.isStreaming ? "animate-pulse" : ""}>
+        {props.user.email}
+      </p>
+      {userStatus.profile?.bio?.isStreaming && <Spinner />}
+    </div>
+  );
+}
+```
+
+### Array Support
+
+For array props, `propStatus` includes `completedItems` and `streamingItems` arrays:
+
+```tsx
+interface ListProps {
+  items: string[];
+}
+
+function StreamingList(props: ListProps) {
+  const { propStatus } = useTamboStreamStatus<ListProps>();
+
+  return (
+    <ul>
+      {/* Render completed items */}
+      {propStatus.items?.completedItems?.map((item, idx) => (
+        <li key={idx}>{item}</li>
+      ))}
+
+      {/* Render streaming items with loading indicator */}
+      {propStatus.items?.streamingItems?.map((item, idx) => (
+        <li key={`streaming-${idx}`} className="animate-pulse">
+          {item}
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+This pattern is useful when streaming lists of items - you can show completed items immediately while indicating which items are still being generated.
 
 ## useTamboSuggestions
 

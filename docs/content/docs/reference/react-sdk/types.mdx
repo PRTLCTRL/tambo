@@ -627,7 +627,7 @@ interface StreamStatus {
 
 ### PropStatus
 
-Per-prop streaming status, returned by `useTamboStreamStatus()`.
+Per-prop streaming status, returned by `useTamboStreamStatus()`. Includes additional fields for array props to track completed and streaming items.
 
 ```typescript
 interface PropStatus {
@@ -635,15 +635,23 @@ interface PropStatus {
   isStreaming: boolean;
   isSuccess: boolean;
   error?: Error;
+  completedItems?: unknown[];
+  streamingItems?: unknown[];
 }
 ```
 
-| Property      | Type      | Description                                        |
-| ------------- | --------- | -------------------------------------------------- |
-| `isPending`   | `boolean` | No tokens received for this prop yet               |
-| `isStreaming` | `boolean` | Tokens received but streaming is not complete      |
-| `isSuccess`   | `boolean` | This prop has finished streaming successfully      |
-| `error`       | `Error`   | Error that occurred during streaming for this prop |
+| Property          | Type        | Description                                                     |
+| ----------------- | ----------- | --------------------------------------------------------------- |
+| `isPending`       | `boolean`   | No tokens received for this prop yet                            |
+| `isStreaming`     | `boolean`   | Tokens received but streaming is not complete                   |
+| `isSuccess`       | `boolean`   | This prop has finished streaming successfully                   |
+| `error`           | `Error`     | Error that occurred during streaming for this prop              |
+| `completedItems`  | `unknown[]` | For array props: items that have completed streaming            |
+| `streamingItems`  | `unknown[]` | For array props: items currently being streamed (usually last)  |
+
+**Nested Objects**: For object props, `PropStatus` also contains nested `PropStatus` objects for each property, allowing you to track the streaming state of deeply nested fields. Access them by casting to an intersection type like `PropStatus & { fieldName?: PropStatus }`.
+
+**Array Props**: The `completedItems` and `streamingItems` fields are only populated for array props. During streaming, all items except the last are in `completedItems`, and the last item is in `streamingItems`. When streaming completes, all items move to `completedItems`.
 
 ## Tool Annotations
 
