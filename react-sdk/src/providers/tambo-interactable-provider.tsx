@@ -1,5 +1,3 @@
-// react-sdk/src/providers/tambo-interactable-provider.tsx
-"use client";
 import { deepEqual } from "fast-equals";
 import { JSONSchema7 } from "json-schema";
 import React, {
@@ -56,7 +54,7 @@ export const TamboInteractableProvider: React.FC<PropsWithChildren> = ({
     TamboInteractableComponent[]
   >([]);
   const toolComponentOwnershipRef = useRef<Record<string, string[]>>({});
-  const { registerTool, unregisterTools } = useTamboRegistry();
+  const { registerTool, unregisterTools, componentList } = useTamboRegistry();
   const { addContextHelper, removeContextHelper } = useTamboContextHelpers();
 
   const registerToolForComponent = useCallback(

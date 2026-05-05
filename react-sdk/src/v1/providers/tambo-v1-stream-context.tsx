@@ -19,6 +19,8 @@ import React, {
 } from "react";
 import { useTamboQuery } from "../../hooks/react-query-hooks";
 import { useTamboClient } from "../../providers/tambo-client-provider";
+import { useTamboInteractable } from "../../providers/tambo-interactable-provider";
+import { useTamboRegistry } from "../../providers/tambo-registry-provider";
 import type { InitialInputMessage, TamboThreadMessage } from "../types/message";
 import type { TamboThread } from "@tambo-ai/client";
 import {
@@ -232,6 +234,7 @@ export function TamboStreamProvider(props: TamboStreamProviderProps) {
       <StreamDispatchContext.Provider value={activeDispatch}>
         <ThreadManagementContext.Provider value={threadManagement}>
           <ThreadSyncManager />
+          <AutoInteractableManager />
           {children}
         </ThreadManagementContext.Provider>
       </StreamDispatchContext.Provider>
@@ -306,6 +309,84 @@ function ThreadSyncManager(): null {
 
     lastSyncedThreadRef.current = currentThreadId;
   }, [messagesSuccess, messagesData, currentThreadId, dispatch]);
+
+  return null;
+}
+
+/**
+ * Internal component that handles automatic interactable component registration.
+ * Watches for component content in messages and automatically registers them as
+ * interactable when autoInteractComponents is enabled in config.
+ * Must be used within StreamStateContext, TamboInteractableProvider, and TamboRegistryProvider.
+ * @internal
+ * @returns null - this component renders nothing
+ */
+function AutoInteractableManager(): null {
+  const { autoInteractComponents } = useTamboConfig();
+  const state = useContext(StreamStateContext);
+  const { addInteractableComponent } = useTamboInteractable();
+  const { componentList } = useTamboRegistry();
+  const registeredComponentIdsRef = useRef<Set<string>>(new Set());
+
+  const currentThreadId = state?.currentThreadId ?? PLACEHOLDER_THREAD_ID;
+  const threadState = state?.threadMap[currentThreadId];
+  const messages = threadState?.thread.messages ?? [];
+
+  useEffect(() => {
+    if (!autoInteractComponents) {
+      return;
+    }
+
+    // Scan all messages for component content
+    for (const message of messages) {
+      if (message.role !== "assistant") continue;
+
+      for (const content of message.content ?? []) {
+        if (content.type !== "component") continue;
+
+        // Skip if already registered
+        if (registeredComponentIdsRef.current.has(content.id)) {
+          continue;
+        }
+
+        // Find the registered component definition
+        const registeredComponent = componentList.find(
+          (c) => c.name === content.name,
+        );
+
+        if (!registeredComponent) {
+          console.warn(
+            `[AutoInteractable] Component ${content.name} not found in registry, skipping auto-interactable registration`,
+          );
+          continue;
+        }
+
+        // Register as interactable
+        try {
+          const interactableId = addInteractableComponent({
+            name: content.name,
+            description:
+              registeredComponent.description ??
+              `Interactable ${content.name}`,
+            component: registeredComponent.component,
+            props: content.props ?? {},
+            propsSchema: registeredComponent.props,
+          });
+
+          registeredComponentIdsRef.current.add(content.id);
+
+          console.debug(
+            `[AutoInteractable] Registered component ${content.name} (message content id: ${content.id}, interactable id: ${interactableId}) as interactable`,
+          );
+        } catch (error) {
+          console.error(
+            `[AutoInteractable] Failed to register component ${content.name} as interactable:`,
+            error,
+          );
+        }
+      }
+    }
+  }, [autoInteractComponents, messages, componentList, addInteractableComponent]);
 
   return null;
 }
