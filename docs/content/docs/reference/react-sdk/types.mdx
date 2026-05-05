@@ -627,7 +627,7 @@ interface StreamStatus {
 
 ### PropStatus
 
-Per-prop streaming status, returned by `useTamboStreamStatus()`.
+Per-prop streaming status, returned by `useTamboStreamStatus()`. Supports nested objects and arrays.
 
 ```typescript
 interface PropStatus {
@@ -635,15 +635,25 @@ interface PropStatus {
   isStreaming: boolean;
   isSuccess: boolean;
   error?: Error;
+  completedItems?: unknown[];
+  streamingItems?: unknown[];
+  [key: string]: unknown;
 }
 ```
 
-| Property      | Type      | Description                                        |
-| ------------- | --------- | -------------------------------------------------- |
-| `isPending`   | `boolean` | No tokens received for this prop yet               |
-| `isStreaming` | `boolean` | Tokens received but streaming is not complete      |
-| `isSuccess`   | `boolean` | This prop has finished streaming successfully      |
-| `error`       | `Error`   | Error that occurred during streaming for this prop |
+| Property          | Type        | Description                                               |
+| ----------------- | ----------- | --------------------------------------------------------- |
+| `isPending`       | `boolean`   | No tokens received for this prop yet                      |
+| `isStreaming`     | `boolean`   | Tokens received but streaming is not complete             |
+| `isSuccess`       | `boolean`   | This prop has finished streaming successfully             |
+| `error`           | `Error`     | Error that occurred during streaming for this prop        |
+| `completedItems`  | `unknown[]` | For arrays: items that have completed streaming           |
+| `streamingItems`  | `unknown[]` | For arrays: items currently being streamed                |
+| `[key: string]`   | `unknown`   | For objects: nested PropStatus for each field             |
+
+**Nested Objects**: For object props, `PropStatus` includes nested status for each field. Access like `propStatus.user.name.isStreaming`.
+
+**Arrays**: For array props, `completedItems` contains items that finished streaming and `streamingItems` contains items still in progress.
 
 ## Tool Annotations
 
