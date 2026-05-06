@@ -384,7 +384,7 @@ function EditableCard({ title: initialTitle }: { title: string }) {
 
 ## useTamboStreamStatus
 
-Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity.
+Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity, including support for nested objects and arrays.
 
 **Important**: Props update repeatedly during streaming and may be partial. Use `propStatus.<field>?.isSuccess` before treating a prop as complete.
 
@@ -413,6 +413,62 @@ function MyComponent(props: MyProps) {
 | -------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | `streamStatus` | [`StreamStatus`](/reference/react-sdk/types#streamstatus) | Overall streaming status for the component                                                                                                     |
 | `propStatus`   | `Partial<Record<keyof Props, PropStatus>>`                | Per-prop streaming status. Keys are absent until the prop receives its first token. See [`PropStatus`](/reference/react-sdk/types#propstatus). |
+
+### Nested Object Tracking
+
+Track streaming status of nested object properties by accessing nested fields in `propStatus`:
+
+```tsx
+interface UserCardProps {
+  user: {
+    name: string;
+    email: string;
+    profile: {
+      bio: string;
+    };
+  };
+}
+
+function UserCard(props: UserCardProps) {
+  const { propStatus } = useTamboStreamStatus<UserCardProps>();
+
+  return (
+    <div>
+      <h3 className={propStatus.user?.name?.isStreaming ? "animate-pulse" : ""}>
+        {props.user.name}
+      </h3>
+      {propStatus.user?.email?.isSuccess && <p>{props.user.email}</p>}
+      {propStatus.user?.profile?.bio?.isStreaming && <Skeleton />}
+    </div>
+  );
+}
+```
+
+### Array Item Tracking
+
+For array props, access `completedItems` and `streamingItems` to render only the items that have finished streaming:
+
+```tsx
+interface RecipeListProps {
+  recipes: Array<{ id: string; name: string }>;
+}
+
+function RecipeList(props: RecipeListProps) {
+  const { propStatus } = useTamboStreamStatus<RecipeListProps>();
+
+  const completed = propStatus.recipes?.completedItems || [];
+  const streaming = propStatus.recipes?.streamingItems || [];
+
+  return (
+    <div>
+      {completed.map((recipe) => (
+        <RecipeCard key={recipe.id} recipe={recipe} />
+      ))}
+      {streaming.length > 0 && <div>Loading {streaming.length} more...</div>}
+    </div>
+  );
+}
+```
 
 <Callout type="info">
   This hook only works inside components rendered via `ComponentRenderer`. The
