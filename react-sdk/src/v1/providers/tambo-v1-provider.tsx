@@ -173,6 +173,14 @@ export interface TamboProviderProps extends Pick<
   initialMessages?: InitialInputMessage[];
 
   /**
+   * Automatically add all generated components to the interactables list.
+   * When enabled, every component in assistant messages is automatically
+   * registered as an interactable, making it updateable via AI.
+   * @default false
+   */
+  autoAddToInteractables?: boolean;
+
+  /**
    * Children components
    */
   children: React.ReactNode;
@@ -238,6 +246,7 @@ function TamboAuthWarnings(): null {
  * @param props.autoGenerateThreadName - Whether to automatically generate thread names. Defaults to true.
  * @param props.autoGenerateNameThreshold - The message count threshold at which the thread name will be auto-generated. Defaults to 3.
  * @param props.initialMessages - Optional initial messages to prepend to the first thread.
+ * @param props.autoAddToInteractables - Automatically add all generated components to interactables. Defaults to false.
  * @param props.children - Child components
  * @returns Provider component tree
  * @example
@@ -274,6 +283,7 @@ export function TamboProvider({
   autoGenerateThreadName,
   autoGenerateNameThreshold,
   initialMessages,
+  autoAddToInteractables,
   children,
 }: PropsWithChildren<TamboProviderProps>) {
   // Config is static - created once and never changes
@@ -305,7 +315,9 @@ export function TamboProvider({
           <TamboMcpTokenProvider>
             <TamboMcpProvider>
               <TamboContextAttachmentProvider>
-                <TamboInteractableProvider>
+                <TamboInteractableProvider
+                  autoAddToInteractables={autoAddToInteractables}
+                >
                   <TamboConfigContext.Provider value={config}>
                     <TamboAuthWarnings />
                     <TamboStreamProvider initialMessages={initialMessages}>

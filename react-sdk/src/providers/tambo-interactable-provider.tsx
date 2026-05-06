@@ -23,6 +23,7 @@ import { makeJsonSchemaPartial, schemaToJsonSchema } from "../schema";
 import { assertValidName } from "../util/validate-component-name";
 import { useTamboRegistry } from "./tambo-registry-provider";
 import { useTamboContextHelpers } from "./tambo-context-helpers-provider";
+import type { TamboComponentContent } from "../v1/types/message";
 
 const TamboInteractableContext = createContext<TamboInteractableContext>({
   interactableComponents: [],
@@ -41,23 +42,37 @@ const TamboInteractableContext = createContext<TamboInteractableContext>({
 /** Synthetic owner ID used to track global interactable tools in the registry. */
 const GLOBAL_INTERACTABLE_OWNER = "__interactable_global__";
 
+export interface TamboInteractableProviderProps extends PropsWithChildren {
+  /**
+   * Automatically add all generated components to the interactables list.
+   * When enabled, every component in assistant messages is automatically
+   * registered as an interactable, making it updateable via AI.
+   * @default false
+   */
+  autoAddToInteractables?: boolean;
+}
+
 /**
  * The TamboInteractableProvider manages a list of components that are currently
  * interactable, allowing tambo to interact with them by updating their props. It also registers tools
  * for Tambo to perform CRUD operations on the components list.
  * @param props - The props for the TamboInteractableProvider
  * @param props.children - The children to wrap
+ * @param props.autoAddToInteractables - Automatically add all generated components to interactables
  * @returns The TamboInteractableProvider component
  */
-export const TamboInteractableProvider: React.FC<PropsWithChildren> = ({
-  children,
-}) => {
+export const TamboInteractableProvider: React.FC<
+  TamboInteractableProviderProps
+> = ({ children, autoAddToInteractables = false }) => {
   const [interactableComponents, setInteractableComponents] = useState<
     TamboInteractableComponent[]
   >([]);
   const toolComponentOwnershipRef = useRef<Record<string, string[]>>({});
   const { registerTool, unregisterTools } = useTamboRegistry();
   const { addContextHelper, removeContextHelper } = useTamboContextHelpers();
+  const { componentList } = useTamboRegistry();
+
+  const processedComponentIdsRef = useRef<Set<string>>(new Set());
 
   const registerToolForComponent = useCallback(
     (componentId: string, tool: TamboTool) => {
@@ -418,6 +433,24 @@ export const TamboInteractableProvider: React.FC<PropsWithChildren> = ({
     [registerToolForComponent, updateInteractableComponentState],
   );
 
+  const autoAddComponentToInteractables = useCallback(
+    (componentName: string, componentProps: Record<string, unknown>) => {
+      const registeredComponent = componentList.get(componentName);
+      if (!registeredComponent) {
+        return;
+      }
+
+      addInteractableComponent({
+        name: componentName,
+        component: registeredComponent.component,
+        description: registeredComponent.description,
+        props: componentProps,
+        propsSchema: registeredComponent.props,
+      });
+    },
+    [componentList, addInteractableComponent],
+  );
+
   const addInteractableComponent = useCallback(
     (
       component: Omit<TamboInteractableComponent, "id" | "createdAt">,
@@ -562,9 +595,65 @@ export const TamboInteractableProvider: React.FC<PropsWithChildren> = ({
 
   return (
     <TamboInteractableContext.Provider value={value}>
+      {autoAddToInteractables && (
+        <AutoAddComponentsWatcher
+          onAutoAdd={autoAddComponentToInteractables}
+          processedIds={processedComponentIdsRef}
+        />
+      )}
       {children}
     </TamboInteractableContext.Provider>
   );
+};
+
+/**
+ * Internal component that watches for new components in messages and automatically adds them to interactables.
+ * This component is only rendered when autoAddToInteractables is enabled.
+ * @internal
+ */
+const AutoAddComponentsWatcher: React.FC<{
+  onAutoAdd: (
+    componentName: string,
+    componentProps: Record<string, unknown>,
+  ) => void;
+  processedIds: React.MutableRefObject<Set<string>>;
+}> = ({ onAutoAdd, processedIds }) => {
+  let streamState: any = null;
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { useStreamState } = require("../v1/providers/tambo-v1-stream-context");
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    streamState = useStreamState();
+  } catch {
+    // Not in v1 context - auto-add won't work
+    return null;
+  }
+
+  useEffect(() => {
+    if (!streamState) return;
+
+    const currentThread = streamState.threads?.[streamState.currentThreadId];
+    if (!currentThread?.messages) return;
+
+    for (const message of currentThread.messages) {
+      if (message.role !== "assistant") continue;
+
+      for (const content of message.content) {
+        if (content.type === "component") {
+          const componentContent = content as TamboComponentContent;
+          const componentId = componentContent.id;
+
+          if (!processedIds.current.has(componentId)) {
+            processedIds.current.add(componentId);
+            onAutoAdd(componentContent.name, componentContent.props ?? {});
+          }
+        }
+      }
+    }
+  }, [streamState, onAutoAdd, processedIds]);
+
+  return null;
 };
 
 /**
