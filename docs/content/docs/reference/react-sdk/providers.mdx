@@ -43,9 +43,10 @@ function App() {
 | `resources`                 | `ListResourceItem[]`                             | No       | Static resources for MCP                                               |
 | `listResources`             | `(query: string) => Promise<ListResourceItem[]>` | No       | Dynamic resource listing                                               |
 | `getResource`               | `(uri: string) => Promise<ReadResourceResult>`   | No       | Resource content resolver                                              |
-| `initialMessages`           | `InitialInputMessage[]`                          | No       | Messages to seed new threads with, displayed before the first API call |
-| `autoGenerateThreadName`    | `boolean`                                        | No       | Auto-generate thread names after a message threshold (default: `true`) |
-| `autoGenerateNameThreshold` | `number`                                         | No       | Messages before auto-generating a thread name (default: `3`)           |
+| `initialMessages`           | `InitialInputMessage[]`                          | No       | Messages to seed new threads with, displayed before the first API call                                         |
+| `autoGenerateThreadName`    | `boolean`                                        | No       | Auto-generate thread names after a message threshold (default: `true`)                                         |
+| `autoGenerateNameThreshold` | `number`                                         | No       | Messages before auto-generating a thread name (default: `3`)                                                   |
+| `autoAddToInteractables`    | `boolean`                                        | No       | Automatically add all AI-generated components to the interactables list, making them updateable (default: `false`) |
 
 \*Exactly one of `userToken` or `userKey` is required to identify the current user.
 

@@ -43,3 +43,80 @@ Place these wherever you normally would within the application to enable a tradi
   href="/guides/enable-generative-ui/register-interactables"
   icon={Rocket}
 />
+
+## Automatic Interactables
+
+By default, you manually decide which components become interactable by wrapping them with `withTamboInteractable` and placing them in your UI. However, Tambo also supports automatically making every generated component interactable.
+
+When you enable the `autoAddToInteractables` prop on `TamboProvider`, Tambo automatically registers every component it generates as an interactable, allowing the AI to update any previously-generated component without requiring you to explicitly wrap it.
+
+```tsx
+<TamboProvider
+  apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
+  userKey={currentUserId}
+  components={components}
+  autoAddToInteractables={true}
+>
+  <Chat />
+</TamboProvider>
+```
+
+### How It Works
+
+When `autoAddToInteractables` is enabled:
+
+1. **Every component in assistant messages** is automatically tracked
+2. **Update tools are automatically registered** for each generated component
+3. **The AI can modify any component** from previous messages without manual setup
+4. **Duplicates are prevented** - each component is only registered once
+
+### When to Use Automatic Interactables
+
+Automatic interactables work best when:
+
+- You want every AI-generated component to be updateable
+- You're building a conversational interface where components evolve over time
+- You want to reduce boilerplate by not manually wrapping components
+- Your use case involves iterating on AI-generated content
+
+### Displaying the Interactables List
+
+When using automatic interactables, you might want to show users which components are currently on screen and can be updated. Use the `useTamboInteractable` hook to access the interactables list:
+
+```tsx
+import { useTamboInteractable } from "@tambo-ai/react";
+
+function InteractablesList() {
+  const { interactableComponents } = useTamboInteractable();
+
+  return (
+    <div>
+      <h2>Components ({interactableComponents.length})</h2>
+      <ul>
+        {interactableComponents.map((component) => (
+          <li key={component.id}>
+            {component.name} - {component.id}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+```
+
+### Example: Iterative Component Generation
+
+With automatic interactables enabled, users can naturally iterate on components across multiple messages:
+
+```
+User: "Create a weather card for San Francisco"
+AI: [Generates WeatherCard with SF data]
+
+User: "Change the city to New York"
+AI: [Updates the same WeatherCard component with NY data]
+
+User: "Make it show the forecast for the next 5 days"
+AI: [Updates the WeatherCard to show 5-day forecast]
+```
+
+Each update modifies the same component instance rather than creating new ones, keeping your UI clean and focused.
