@@ -419,6 +419,87 @@ function MyComponent(props: MyProps) {
   renderer provides the necessary context for tracking streaming state.
 </Callout>
 
+### Nested Object Support
+
+For props with nested objects, `propStatus` includes nested property statuses:
+
+```tsx
+interface UserCardProps {
+  user: {
+    name: string;
+    email: string;
+    address: {
+      city: string;
+      country: string;
+    };
+  };
+}
+
+function UserCard(props: UserCardProps) {
+  const { propStatus } = useTamboStreamStatus<UserCardProps>();
+
+  const userStatus = propStatus.user;
+
+  return (
+    <div>
+      <h2 className={userStatus?.name?.isStreaming ? "animate-pulse" : ""}>
+        {props.user?.name}
+      </h2>
+      <p className={userStatus?.email?.isStreaming ? "animate-pulse" : ""}>
+        {props.user?.email}
+      </p>
+      <p className={userStatus?.address?.city?.isStreaming ? "animate-pulse" : ""}>
+        {props.user?.address?.city}, {props.user?.address?.country}
+      </p>
+    </div>
+  );
+}
+```
+
+Access nested status via chained property access: `propStatus.user?.name?.isStreaming` or `propStatus.user?.address?.city?.isSuccess`.
+
+### Array Support
+
+For array props, `propStatus` includes `completedItems` and `streamingItems`:
+
+```tsx
+interface TaskListProps {
+  tasks: Array<{ id: string; title: string; done: boolean }>;
+}
+
+function TaskList(props: TaskListProps) {
+  const { propStatus } = useTamboStreamStatus<TaskListProps>();
+
+  const tasksStatus = propStatus.tasks;
+
+  return (
+    <div>
+      <h3>Completed Tasks</h3>
+      <ul>
+        {tasksStatus?.completedItems?.map((task) => (
+          <li key={task.id}>{task.title}</li>
+        ))}
+      </ul>
+
+      {tasksStatus?.streamingItems && tasksStatus.streamingItems.length > 0 && (
+        <>
+          <h3>Currently Streaming</h3>
+          <ul>
+            {tasksStatus.streamingItems.map((task) => (
+              <li key={task.id} className="animate-pulse">
+                {task.title}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+```
+
+During streaming, `completedItems` contains all items except the last one, and `streamingItems` contains the item currently being streamed. Once streaming completes, all items move to `completedItems`.
+
 ## useTamboSuggestions
 
 Generate and manage AI-powered message suggestions.
