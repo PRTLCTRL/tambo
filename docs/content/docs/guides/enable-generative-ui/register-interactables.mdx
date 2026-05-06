@@ -125,6 +125,41 @@ Tambo can now see and modify this component when users send messages like:
 - "Change the note title to 'Important Reminder'"
 - "Update the note content to 'Don't forget the meeting at 3pm'"
 
+## Alternative: Automatic Interactables
+
+If you want all AI-generated components to automatically become interactable without manually wrapping them, enable the `autoInteractables` prop on `TamboProvider`:
+
+```tsx
+import { TamboProvider } from "@tambo-ai/react";
+
+function App() {
+  return (
+    <TamboProvider
+      apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
+      userKey={currentUserId}
+      components={components}
+      autoInteractables={true}
+    >
+      <Chat />
+    </TamboProvider>
+  );
+}
+```
+
+With `autoInteractables` enabled, any component Tambo generates in message responses is automatically added to the interactables list. Users can ask Tambo to update previously generated components without additional setup.
+
+**When to use automatic interactables:**
+
+- Building chat interfaces where generated components should be updateable
+- Allowing users to refine AI-generated content through follow-up messages
+- Reducing boilerplate when most components should be interactable
+
+**When to use `withTamboInteractable`:**
+
+- Pre-placing components in your UI layout
+- Needing explicit control over which components are interactable
+- Requiring custom interactable configuration per component
+
 ## Complete Example
 
 Here's a complete working example:

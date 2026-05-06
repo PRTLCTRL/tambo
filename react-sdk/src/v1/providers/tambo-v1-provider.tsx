@@ -46,6 +46,7 @@ import type {
 import type { InitialInputMessage } from "../types/message";
 import { TamboStreamProvider } from "./tambo-v1-stream-context";
 import { TamboThreadInputProvider } from "./tambo-v1-thread-input-provider";
+import { AutoInteractablesManager } from "./tambo-v1-auto-interactables";
 
 /**
  * Configuration values for the SDK.
@@ -63,6 +64,8 @@ export interface TamboConfig {
    * These are displayed in the UI immediately and sent to the API on first message.
    */
   initialMessages?: InitialInputMessage[];
+  /** Automatically add all AI-generated components to interactables. Defaults to false. */
+  autoInteractables?: boolean;
 }
 
 /**
@@ -173,6 +176,15 @@ export interface TamboProviderProps extends Pick<
   initialMessages?: InitialInputMessage[];
 
   /**
+   * Automatically add all AI-generated components to the interactables list.
+   * When enabled, components that Tambo generates in message responses are
+   * automatically registered as interactable, allowing them to be updated
+   * in subsequent messages without needing to wrap them with withTamboInteractable.
+   * Defaults to false.
+   */
+  autoInteractables?: boolean;
+
+  /**
    * Children components
    */
   children: React.ReactNode;
@@ -274,6 +286,7 @@ export function TamboProvider({
   autoGenerateThreadName,
   autoGenerateNameThreshold,
   initialMessages,
+  autoInteractables = false,
   children,
 }: PropsWithChildren<TamboProviderProps>) {
   // Config is static - created once and never changes
@@ -282,6 +295,7 @@ export function TamboProvider({
     autoGenerateThreadName,
     autoGenerateNameThreshold,
     initialMessages,
+    autoInteractables,
   };
 
   return (
@@ -309,6 +323,7 @@ export function TamboProvider({
                   <TamboConfigContext.Provider value={config}>
                     <TamboAuthWarnings />
                     <TamboStreamProvider initialMessages={initialMessages}>
+                      <AutoInteractablesManager />
                       <TamboThreadInputProvider>
                         {children}
                       </TamboThreadInputProvider>
