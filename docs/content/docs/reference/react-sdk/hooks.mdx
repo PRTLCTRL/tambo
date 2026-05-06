@@ -407,6 +407,78 @@ function MyComponent(props: MyProps) {
 }
 ```
 
+### Nested Object Tracking
+
+Track streaming status for nested object properties:
+
+```tsx
+interface UserProfile {
+  user: {
+    name: string;
+    email: string;
+    address: {
+      city: string;
+      country: string;
+    };
+  };
+}
+
+function ProfileCard(props: UserProfile) {
+  const { propStatus } = useTamboStreamStatus<UserProfile>();
+
+  return (
+    <div>
+      <h3 className={propStatus.user?.name?.isStreaming ? "loading" : ""}>
+        {props.user?.name}
+      </h3>
+      <p className={propStatus.user?.email?.isStreaming ? "loading" : ""}>
+        {props.user?.email}
+      </p>
+      <p className={propStatus.user?.address?.city?.isStreaming ? "loading" : ""}>
+        {props.user?.address?.city}, {props.user?.address?.country}
+      </p>
+    </div>
+  );
+}
+```
+
+Access nested status using dot notation: `propStatus.user.name.isStreaming`.
+
+### Array Item Tracking
+
+For array props, use `completedItems` and `streamingItems` to show only completed items or indicate streaming progress:
+
+```tsx
+interface ItemList {
+  items: Array<{ id: string; name: string; description: string }>;
+}
+
+function ItemGrid(props: ItemList) {
+  const { propStatus } = useTamboStreamStatus<ItemList>();
+
+  const completedItems = (propStatus.items?.completedItems ?? []) as typeof props.items;
+  const streamingItems = (propStatus.items?.streamingItems ?? []) as typeof props.items;
+
+  return (
+    <div>
+      {completedItems.map((item) => (
+        <div key={item.id}>
+          <h4>{item.name}</h4>
+          <p>{item.description}</p>
+        </div>
+      ))}
+      {streamingItems.length > 0 && (
+        <div className="streaming-indicator">
+          Streaming {streamingItems.length} items...
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+This pattern is useful when you want to display completed items immediately while the AI continues streaming more items.
+
 ### Return Values
 
 | Value          | Type                                                      | Description                                                                                                                                    |
