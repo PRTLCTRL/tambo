@@ -627,7 +627,7 @@ interface StreamStatus {
 
 ### PropStatus
 
-Per-prop streaming status, returned by `useTamboStreamStatus()`.
+Per-prop streaming status, returned by `useTamboStreamStatus()`. Supports nested objects and arrays with granular tracking.
 
 ```typescript
 interface PropStatus {
@@ -635,15 +635,39 @@ interface PropStatus {
   isStreaming: boolean;
   isSuccess: boolean;
   error?: Error;
+  completedItems?: unknown[];
+  streamingItems?: unknown[];
 }
 ```
 
-| Property      | Type      | Description                                        |
-| ------------- | --------- | -------------------------------------------------- |
-| `isPending`   | `boolean` | No tokens received for this prop yet               |
-| `isStreaming` | `boolean` | Tokens received but streaming is not complete      |
-| `isSuccess`   | `boolean` | This prop has finished streaming successfully      |
-| `error`       | `Error`   | Error that occurred during streaming for this prop |
+| Property         | Type        | Description                                                                  |
+| ---------------- | ----------- | ---------------------------------------------------------------------------- |
+| `isPending`      | `boolean`   | No tokens received for this prop yet                                         |
+| `isStreaming`    | `boolean`   | Tokens received but streaming is not complete                                |
+| `isSuccess`      | `boolean`   | This prop has finished streaming successfully                                |
+| `error`          | `Error`     | Error that occurred during streaming for this prop                           |
+| `completedItems` | `unknown[]` | For array props: items that have finished streaming (only present for arrays)|
+| `streamingItems` | `unknown[]` | For array props: items currently streaming (only present for arrays)         |
+
+#### Nested Object Support
+
+For props that are objects, `PropStatus` includes nested status for each property:
+
+```typescript
+// Example: user prop with nested name and email
+propStatus.user?.name?.isStreaming; // Status of user.name
+propStatus.user?.email?.isSuccess;  // Status of user.email
+```
+
+#### Array Support
+
+For array props, use `completedItems` and `streamingItems` to display partial results:
+
+```typescript
+// Example: tasks array prop
+propStatus.tasks?.completedItems?.map(task => <TaskCard {...task} />)
+propStatus.tasks?.streamingItems?.map(task => <TaskCard {...task} isStreaming />)
+```
 
 ## Tool Annotations
 
