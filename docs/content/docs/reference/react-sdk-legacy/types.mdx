@@ -358,14 +358,27 @@ interface StreamStatus {
 
 Streaming status flags for individual component props. Returned by `useTamboStreamStatus`.
 
+Supports tracking of nested object properties and array items with granular status information.
+
 ```typescript
 interface PropStatus {
   isPending: boolean; // No tokens received for this prop yet
   isStreaming: boolean; // Prop has partial content, still updating
   isSuccess: boolean; // Prop finished streaming successfully
   error?: Error; // Error during streaming (if any)
+  
+  // For array props only:
+  completedItems?: unknown[]; // Items that have finished streaming
+  streamingItems?: unknown[]; // Items currently streaming
+  
+  // For nested object props - contains nested PropStatus objects
+  [key: string]: PropStatus | boolean | Error | unknown[] | undefined;
 }
 ```
+
+**Nested Objects**: When a prop is an object, the `PropStatus` contains nested `PropStatus` objects for each property. Access nested status using dot notation: `propStatus.user.name.isStreaming`.
+
+**Arrays**: When a prop is an array, the `PropStatus` includes `completedItems` (items that finished streaming) and `streamingItems` (items currently streaming). During streaming, the last item is considered streaming while previous items are completed.
 
 ## TamboInteractableComponent
 

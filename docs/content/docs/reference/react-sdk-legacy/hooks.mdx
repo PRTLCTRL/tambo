@@ -451,6 +451,13 @@ interface PropStatus {
   isStreaming: boolean; // Prop has partial content, still updating
   isSuccess: boolean; // Prop finished streaming successfully
   error?: Error; // Error during streaming (if any)
+  
+  // For array props only:
+  completedItems?: unknown[]; // Items that have finished streaming
+  streamingItems?: unknown[]; // Items currently streaming
+  
+  // For nested object props - contains nested PropStatus objects
+  [key: string]: PropStatus | boolean | Error | unknown[] | undefined;
 }
 ```
 
@@ -475,6 +482,58 @@ return (
   <h2 className={propStatus.title?.isStreaming ? "animate-pulse" : ""}>
     {title}
   </h2>
+);
+```
+
+### Example: Track nested object streaming
+
+```tsx
+interface UserProps {
+  user: {
+    name: string;
+    email: string;
+    profile: {
+      bio: string;
+      avatar: string;
+    };
+  };
+}
+
+const { propStatus } = useTamboStreamStatus<UserProps>();
+
+// Access nested status
+const userNameStreaming = propStatus.user?.name?.isStreaming;
+const profileBioComplete = propStatus.user?.profile?.bio?.isSuccess;
+
+return (
+  <div>
+    <h3 className={userNameStreaming ? "animate-pulse" : ""}>
+      {user.name}
+    </h3>
+    {profileBioComplete && <p>{user.profile.bio}</p>}
+  </div>
+);
+```
+
+### Example: Display completed array items only
+
+```tsx
+interface ListProps {
+  items: Array<{ id: number; name: string }>;
+}
+
+const { propStatus } = useTamboStreamStatus<ListProps>();
+
+// Show only completed items, hide streaming ones
+const completedItems = propStatus.items?.completedItems ?? [];
+
+return (
+  <ul>
+    {completedItems.map((item) => (
+      <li key={item.id}>{item.name}</li>
+    ))}
+    {propStatus.items?.isStreaming && <li>Loading more...</li>}
+  </ul>
 );
 ```
 
