@@ -384,9 +384,16 @@ function EditableCard({ title: initialTitle }: { title: string }) {
 
 ## useTamboStreamStatus
 
-Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity.
+Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity, including support for nested objects and arrays.
 
 **Important**: Props update repeatedly during streaming and may be partial. Use `propStatus.<field>?.isSuccess` before treating a prop as complete.
+
+### Nested Objects and Arrays
+
+The hook now supports tracking nested object properties and array items:
+
+- **Nested objects**: Access nested property status using dot notation: `propStatus.user.name.isStreaming`
+- **Arrays**: Access `completedItems` and `streamingItems` to show only completed items during streaming
 
 ```tsx
 import { useTamboStreamStatus } from "@tambo-ai/react";
@@ -403,6 +410,57 @@ function MyComponent(props: MyProps) {
       </h2>
       {streamStatus.isSuccess && <p>Stream complete</p>}
     </div>
+  );
+}
+```
+
+### Nested Object Example
+
+```tsx
+interface UserProps {
+  user: {
+    name: string;
+    email: string;
+    profile: {
+      bio: string;
+    };
+  };
+}
+
+function UserCard(props: UserProps) {
+  const { propStatus } = useTamboStreamStatus<UserProps>();
+
+  return (
+    <div>
+      <h2 className={propStatus.user?.name?.isStreaming ? "animate-pulse" : ""}>
+        {props.user.name}
+      </h2>
+      <p className={propStatus.user?.profile?.bio?.isStreaming ? "animate-pulse" : ""}>
+        {props.user.profile.bio}
+      </p>
+    </div>
+  );
+}
+```
+
+### Array Example
+
+```tsx
+interface ListProps {
+  items: string[];
+}
+
+function ItemList(props: ListProps) {
+  const { propStatus } = useTamboStreamStatus<ListProps>();
+
+  const displayItems = propStatus.items?.completedItems ?? props.items;
+
+  return (
+    <ul>
+      {displayItems.map((item) => (
+        <li key={item}>{item}</li>
+      ))}
+    </ul>
   );
 }
 ```
