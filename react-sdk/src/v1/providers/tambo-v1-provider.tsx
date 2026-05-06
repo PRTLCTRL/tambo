@@ -46,6 +46,7 @@ import type {
 import type { InitialInputMessage } from "../types/message";
 import { TamboStreamProvider } from "./tambo-v1-stream-context";
 import { TamboThreadInputProvider } from "./tambo-v1-thread-input-provider";
+import { AutoInteractableWatcher } from "./tambo-v1-auto-interactable-watcher";
 
 /**
  * Configuration values for the SDK.
@@ -173,6 +174,14 @@ export interface TamboProviderProps extends Pick<
   initialMessages?: InitialInputMessage[];
 
   /**
+   * Automatically add all generated components to the interactables list.
+   * When enabled, every component that Tambo generates becomes interactable,
+   * allowing users to update previously-generated components through conversation.
+   * Defaults to false.
+   */
+  autoAddInteractables?: boolean;
+
+  /**
    * Children components
    */
   children: React.ReactNode;
@@ -238,6 +247,7 @@ function TamboAuthWarnings(): null {
  * @param props.autoGenerateThreadName - Whether to automatically generate thread names. Defaults to true.
  * @param props.autoGenerateNameThreshold - The message count threshold at which the thread name will be auto-generated. Defaults to 3.
  * @param props.initialMessages - Optional initial messages to prepend to the first thread.
+ * @param props.autoAddInteractables - Automatically add all generated components to interactables. Defaults to false.
  * @param props.children - Child components
  * @returns Provider component tree
  * @example
@@ -274,6 +284,7 @@ export function TamboProvider({
   autoGenerateThreadName,
   autoGenerateNameThreshold,
   initialMessages,
+  autoAddInteractables,
   children,
 }: PropsWithChildren<TamboProviderProps>) {
   // Config is static - created once and never changes
@@ -309,6 +320,9 @@ export function TamboProvider({
                   <TamboConfigContext.Provider value={config}>
                     <TamboAuthWarnings />
                     <TamboStreamProvider initialMessages={initialMessages}>
+                      <AutoInteractableWatcher
+                        enabled={autoAddInteractables ?? false}
+                      />
                       <TamboThreadInputProvider>
                         {children}
                       </TamboThreadInputProvider>
