@@ -627,7 +627,7 @@ interface StreamStatus {
 
 ### PropStatus
 
-Per-prop streaming status, returned by `useTamboStreamStatus()`.
+Per-prop streaming status, returned by `useTamboStreamStatus()`. Supports nested objects and arrays with additional tracking fields.
 
 ```typescript
 interface PropStatus {
@@ -635,15 +635,29 @@ interface PropStatus {
   isStreaming: boolean;
   isSuccess: boolean;
   error?: Error;
+  
+  // For array props
+  completedItems?: Array<{ index: number; value: unknown }>;
+  streamingItems?: Array<{ index: number; value: unknown }>;
+  
+  // For nested objects
+  [key: string]: unknown;
 }
 ```
 
-| Property      | Type      | Description                                        |
-| ------------- | --------- | -------------------------------------------------- |
-| `isPending`   | `boolean` | No tokens received for this prop yet               |
-| `isStreaming` | `boolean` | Tokens received but streaming is not complete      |
-| `isSuccess`   | `boolean` | This prop has finished streaming successfully      |
-| `error`       | `Error`   | Error that occurred during streaming for this prop |
+| Property          | Type                                        | Description                                                                    |
+| ----------------- | ------------------------------------------- | ------------------------------------------------------------------------------ |
+| `isPending`       | `boolean`                                   | No tokens received for this prop yet                                           |
+| `isStreaming`     | `boolean`                                   | Tokens received but streaming is not complete                                  |
+| `isSuccess`       | `boolean`                                   | This prop has finished streaming successfully                                  |
+| `error`           | `Error`                                     | Error that occurred during streaming for this prop                             |
+| `completedItems`  | `Array<{ index: number; value: unknown }>` | For array props: items that have completed streaming with their indices        |
+| `streamingItems`  | `Array<{ index: number; value: unknown }>` | For array props: items currently streaming with their indices                  |
+| `[key: string]`   | `unknown`                                   | For object props: nested property keys map to their own `PropStatus` objects   |
+
+**Nested Objects**: When a prop is an object, each nested property key maps to its own `PropStatus`, allowing you to track streaming status at any depth (e.g., `propStatus.user.name.isStreaming`).
+
+**Array Props**: When a prop is an array, `completedItems` and `streamingItems` provide lists of items with their array indices, making it easy to render only completed items during streaming.
 
 ## Tool Annotations
 

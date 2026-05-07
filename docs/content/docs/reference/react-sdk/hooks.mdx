@@ -419,6 +419,88 @@ function MyComponent(props: MyProps) {
   renderer provides the necessary context for tracking streaming state.
 </Callout>
 
+### Nested Objects and Arrays
+
+The hook supports tracking streaming status for nested object properties and array elements.
+
+#### Nested Object Example
+
+```tsx
+interface UserCardProps {
+  user: {
+    name: string;
+    email: string;
+    address: {
+      city: string;
+      country: string;
+    };
+  };
+}
+
+function UserCard(props: UserCardProps) {
+  const { propStatus } = useTamboStreamStatus<UserCardProps>();
+
+  // Access nested property status by casting (TypeScript doesn't infer deep structure)
+  const userStatus = propStatus.user as any;
+
+  return (
+    <div>
+      {/* Show streaming indicator on individual nested fields */}
+      <div className={userStatus?.name?.isStreaming ? "animate-pulse" : ""}>
+        {props.user?.name}
+      </div>
+      
+      {/* Check if nested field has completed before rendering */}
+      {userStatus?.email?.isSuccess && (
+        <a href={`mailto:${props.user?.email}`}>{props.user?.email}</a>
+      )}
+
+      {/* Access deeply nested properties */}
+      {userStatus?.address?.city?.isSuccess && (
+        <span>{props.user?.address?.city}, {props.user?.address?.country}</span>
+      )}
+    </div>
+  );
+}
+```
+
+#### Array Props Example
+
+For array props, the hook provides `completedItems` and `streamingItems` to help you display only the items that have finished streaming:
+
+```tsx
+interface TaskListProps {
+  tasks: Array<{ id: string; title: string; completed: boolean }>;
+}
+
+function TaskList(props: TaskListProps) {
+  const { propStatus } = useTamboStreamStatus<TaskListProps>();
+
+  // During streaming, only show completed items
+  const itemsToShow = propStatus.tasks?.isSuccess
+    ? props.tasks // Show all when done
+    : (propStatus.tasks?.completedItems?.map(item => item.value) ?? []); // Show completed during streaming
+
+  return (
+    <ul>
+      {itemsToShow.map((task, index) => (
+        <li key={task.id ?? index}>
+          <input type="checkbox" checked={task.completed} readOnly />
+          {task.title}
+        </li>
+      ))}
+      
+      {/* Show loading indicator for streaming items */}
+      {propStatus.tasks?.streamingItems?.length > 0 && (
+        <li className="animate-pulse">Loading more tasks...</li>
+      )}
+    </ul>
+  );
+}
+```
+
+The `completedItems` and `streamingItems` arrays contain objects with `{ index: number, value: unknown }` structure, allowing you to track both the position and value of each item.
+
 ## useTamboSuggestions
 
 Generate and manage AI-powered message suggestions.
