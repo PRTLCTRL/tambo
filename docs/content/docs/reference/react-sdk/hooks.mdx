@@ -388,6 +388,10 @@ Track streaming status for components rendered via `ComponentRenderer`. Provides
 
 **Important**: Props update repeatedly during streaming and may be partial. Use `propStatus.<field>?.isSuccess` before treating a prop as complete.
 
+**Nested Objects**: The `propStatus` object mirrors your prop structure. Access nested properties like `propStatus.user?.name?.isStreaming`.
+
+**Arrays**: Array props include `completedItems` and `streamingItems` arrays, allowing you to display completed items while streaming continues.
+
 ```tsx
 import { useTamboStreamStatus } from "@tambo-ai/react";
 
@@ -418,6 +422,142 @@ function MyComponent(props: MyProps) {
   This hook only works inside components rendered via `ComponentRenderer`. The
   renderer provides the necessary context for tracking streaming state.
 </Callout>
+
+### Example: Nested Object Status
+
+Track the streaming status of nested properties:
+
+```tsx
+interface UserCardProps {
+  user: {
+    name: string;
+    email: string;
+    profile: {
+      bio: string;
+      avatar: string;
+    };
+  };
+}
+
+function UserCard(props: UserCardProps) {
+  const { propStatus } = useTamboStreamStatus<UserCardProps>();
+
+  return (
+    <div>
+      <h2 className={propStatus.user?.name?.isStreaming ? "loading" : ""}>
+        {props.user.name}
+      </h2>
+
+      <p className={propStatus.user?.email?.isStreaming ? "loading" : ""}>
+        {props.user.email}
+      </p>
+
+      <div className={propStatus.user?.profile?.bio?.isStreaming ? "loading" : ""}>
+        {props.user.profile.bio}
+      </div>
+
+      {propStatus.user?.profile?.avatar?.isSuccess && (
+        <img src={props.user.profile.avatar} alt="Profile" />
+      )}
+    </div>
+  );
+}
+```
+
+### Example: Array Items
+
+Display completed array items while streaming continues:
+
+```tsx
+interface TaskListProps {
+  tasks: Array<{ id: string; title: string; completed: boolean }>;
+}
+
+function TaskList(props: TaskListProps) {
+  const { propStatus } = useTamboStreamStatus<TaskListProps>();
+
+  // Get completed and streaming items
+  const completedTasks = (propStatus.tasks?.completedItems || []) as TaskListProps["tasks"];
+  const streamingTasks = (propStatus.tasks?.streamingItems || []) as TaskListProps["tasks"];
+
+  return (
+    <div>
+      <h3>Tasks</h3>
+      <ul>
+        {completedTasks.map((task) => (
+          <li key={task.id}>
+            {task.title} {task.completed && "✓"}
+          </li>
+        ))}
+        {streamingTasks.map((task, i) => (
+          <li key={`streaming-${i}`} className="animate-pulse">
+            {task.title}...
+          </li>
+        ))}
+      </ul>
+      {propStatus.tasks?.isSuccess && (
+        <p>All tasks loaded ({completedTasks.length} total)</p>
+      )}
+    </div>
+  );
+}
+```
+
+### Example: Mixed Nested and Array
+
+Handle complex prop structures with nested objects and arrays:
+
+```tsx
+interface DashboardProps {
+  user: {
+    name: string;
+    notifications: string[];
+  };
+  stats: {
+    views: number;
+    likes: number;
+  };
+}
+
+function Dashboard(props: DashboardProps) {
+  const { streamStatus, propStatus } = useTamboStreamStatus<DashboardProps>();
+
+  const userStatus = propStatus.user as PropStatus & {
+    name?: PropStatus;
+    notifications?: PropStatus;
+  };
+
+  const completedNotifications =
+    (userStatus?.notifications?.completedItems as string[]) || [];
+
+  return (
+    <div>
+      {/* Show user name with loading state */}
+      <h1 className={userStatus?.name?.isStreaming ? "loading" : ""}>
+        {props.user.name}
+      </h1>
+
+      {/* Display completed notifications */}
+      <div>
+        <h2>Notifications</h2>
+        <ul>
+          {completedNotifications.map((notification, i) => (
+            <li key={i}>{notification}</li>
+          ))}
+        </ul>
+      </div>
+
+      {/* Show stats when ready */}
+      {propStatus.stats?.isSuccess && (
+        <div>
+          <p>Views: {props.stats.views}</p>
+          <p>Likes: {props.stats.likes}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+```
 
 ## useTamboSuggestions
 

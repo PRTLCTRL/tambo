@@ -629,21 +629,74 @@ interface StreamStatus {
 
 Per-prop streaming status, returned by `useTamboStreamStatus()`.
 
+For nested objects, the status object mirrors the prop structure, allowing access like `propStatus.user?.name?.isStreaming`.
+
+For arrays, includes `completedItems` and `streamingItems` arrays.
+
 ```typescript
 interface PropStatus {
   isPending: boolean;
   isStreaming: boolean;
   isSuccess: boolean;
   error?: Error;
+  completedItems?: unknown[]; // Only present for array props
+  streamingItems?: unknown[]; // Only present for array props
+  [key: string]: unknown; // Nested PropStatus for object props
 }
 ```
 
-| Property      | Type      | Description                                        |
-| ------------- | --------- | -------------------------------------------------- |
-| `isPending`   | `boolean` | No tokens received for this prop yet               |
-| `isStreaming` | `boolean` | Tokens received but streaming is not complete      |
-| `isSuccess`   | `boolean` | This prop has finished streaming successfully      |
-| `error`       | `Error`   | Error that occurred during streaming for this prop |
+| Property         | Type        | Description                                                      |
+| ---------------- | ----------- | ---------------------------------------------------------------- |
+| `isPending`      | `boolean`   | No tokens received for this prop yet                             |
+| `isStreaming`    | `boolean`   | Tokens received but streaming is not complete                    |
+| `isSuccess`      | `boolean`   | This prop has finished streaming successfully                    |
+| `error`          | `Error`     | Error that occurred during streaming for this prop               |
+| `completedItems` | `unknown[]` | For array props: items that have completed streaming             |
+| `streamingItems` | `unknown[]` | For array props: items currently being streamed (not yet complete) |
+| `[key: string]`  | `unknown`   | For object props: nested PropStatus for each property            |
+
+#### Examples
+
+**Nested objects:**
+
+```typescript
+interface UserProps {
+  user: {
+    name: string;
+    email: string;
+  };
+}
+
+const { propStatus } = useTamboStreamStatus<UserProps>();
+
+// Access nested status
+if (propStatus.user?.name?.isStreaming) {
+  // user.name is currently streaming
+}
+```
+
+**Arrays:**
+
+```typescript
+interface ListProps {
+  items: string[];
+}
+
+const { propStatus } = useTamboStreamStatus<ListProps>();
+
+// Access completed and streaming items
+const completed = propStatus.items?.completedItems || [];
+const streaming = propStatus.items?.streamingItems || [];
+
+// Display completed items while streaming continues
+return (
+  <ul>
+    {completed.map((item, i) => (
+      <li key={i}>{item}</li>
+    ))}
+  </ul>
+);
+```
 
 ## Tool Annotations
 
