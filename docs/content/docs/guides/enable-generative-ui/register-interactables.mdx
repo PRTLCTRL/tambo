@@ -98,6 +98,14 @@ Unlike generative components, Interactable components register themselves automa
 
 </Callout>
 
+<Callout type="info" title="Automatic Interactables Mode">
+
+Rather than manually wrapping components, you can enable automatic interactables mode by setting `autoAddComponentsToInteractables={true}` on `TamboProvider`. When enabled, all AI-generated components automatically become interactable without needing `withTamboInteractable`. This is useful when you want Tambo to iterate on and refine components rather than always creating new ones.
+
+Learn more about [Automatic Interactables](/concepts/generative-interfaces/interactable-components#automatic-interactables).
+
+</Callout>
+
 ## Step 4: Render in Your App
 
 Place the Interactable component in your app where you want it to appear, within the `TamboProvider`:

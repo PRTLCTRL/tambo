@@ -19,7 +19,13 @@ import React, {
 } from "react";
 import { useTamboQuery } from "../../hooks/react-query-hooks";
 import { useTamboClient } from "../../providers/tambo-client-provider";
-import type { InitialInputMessage, TamboThreadMessage } from "../types/message";
+import { useTamboInteractable } from "../../providers/tambo-interactable-provider";
+import { useTamboRegistry } from "../../providers/tambo-registry-provider";
+import type {
+  InitialInputMessage,
+  TamboComponentContent,
+  TamboThreadMessage,
+} from "../types/message";
 import type { TamboThread } from "@tambo-ai/client";
 import {
   createInitialState,
@@ -232,6 +238,7 @@ export function TamboStreamProvider(props: TamboStreamProviderProps) {
       <StreamDispatchContext.Provider value={activeDispatch}>
         <ThreadManagementContext.Provider value={threadManagement}>
           <ThreadSyncManager />
+          <AutoInteractableRegistrar />
           {children}
         </ThreadManagementContext.Provider>
       </StreamDispatchContext.Provider>
@@ -306,6 +313,76 @@ function ThreadSyncManager(): null {
 
     lastSyncedThreadRef.current = currentThreadId;
   }, [messagesSuccess, messagesData, currentThreadId, dispatch]);
+
+  return null;
+}
+
+/**
+ * Internal component that automatically registers components as interactables
+ * when autoAddComponents is enabled.
+ * Tracks component IDs that have been registered to avoid duplicates.
+ * @internal
+ * @returns null - this component renders nothing
+ */
+function AutoInteractableRegistrar(): null {
+  const state = useContext(StreamStateContext);
+  const { autoAddComponents, addInteractableComponent } =
+    useTamboInteractable();
+  const { componentList } = useTamboRegistry();
+  const registeredComponentIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!autoAddComponents || !state) return;
+
+    const currentThreadId = state.currentThreadId;
+    const threadState = state.threadMap[currentThreadId];
+    if (!threadState) return;
+
+    const messages = threadState.thread.messages;
+    const assistantMessages = messages.filter((m) => m.role === "assistant");
+
+    for (const message of assistantMessages) {
+      for (const content of message.content) {
+        if (content.type === "component") {
+          const componentContent = content as TamboComponentContent;
+          const componentId = componentContent.id;
+
+          if (registeredComponentIdsRef.current.has(componentId)) {
+            continue;
+          }
+
+          const registeredComponent = componentList[componentContent.name];
+          if (!registeredComponent) {
+            continue;
+          }
+
+          try {
+            addInteractableComponent({
+              name: componentContent.name,
+              description:
+                registeredComponent.description ||
+                `Component ${componentContent.name}`,
+              component: registeredComponent.component,
+              props: componentContent.props || {},
+              propsSchema: registeredComponent.props,
+            });
+
+            registeredComponentIdsRef.current.add(componentId);
+          } catch (error) {
+            console.error(
+              `Failed to auto-register component ${componentContent.name} as interactable`,
+              error,
+            );
+          }
+        }
+      }
+    }
+  }, [
+    state,
+    autoAddComponents,
+    addInteractableComponent,
+    componentList,
+  ]);
 
   return null;
 }
