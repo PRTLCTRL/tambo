@@ -12,6 +12,7 @@ import type TamboAI from "@tambo-ai/typescript-sdk";
 import React, {
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   type ReactElement,
@@ -42,6 +43,7 @@ import type {
 } from "../types/message";
 import type { StreamingState } from "@tambo-ai/client";
 import { isPlaceholderThreadId, type ThreadState } from "@tambo-ai/client";
+import { useTamboInteractable } from "../../providers/tambo-interactable-provider";
 
 /**
  * Return type for useTambo hook
@@ -208,19 +210,79 @@ interface ComponentCacheEntry {
 export function useTambo(): UseTamboReturn {
   const client = useTamboClient();
   const queryClient = useTamboQueryClient();
-  const { userKey } = useTamboConfig();
+  const { userKey, autoAddToInteractables } = useTamboConfig();
   const streamState = useStreamState();
   const dispatch = useStreamDispatch();
   const registry = useContext(TamboRegistryContext);
   const threadManagement = useThreadManagement();
   const authState = useTamboAuthState();
+  const { addInteractableComponent, getInteractableComponent } =
+    useTamboInteractable();
 
   // Cache for rendered component wrappers - maintains stable element references
   // across renders when props haven't changed
   const componentCacheRef = useRef(new Map<string, ComponentCacheEntry>());
 
+  // Track which component IDs have been added to interactables to prevent duplicates
+  const addedToInteractablesRef = useRef(new Set<string>());
+
   // Get thread state for the current thread
   const threadState = streamState.threadMap[streamState.currentThreadId];
+
+  // Auto-add components to interactables when feature is enabled
+  useEffect(() => {
+    if (!autoAddToInteractables || !threadState) {
+      return;
+    }
+
+    const messages = threadState.thread.messages;
+
+    for (const message of messages) {
+      for (const content of message.content) {
+        if (content.type === "component") {
+          const componentId = content.id;
+
+          // Skip if already added to interactables
+          if (
+            addedToInteractablesRef.current.has(componentId) ||
+            getInteractableComponent(componentId)
+          ) {
+            continue;
+          }
+
+          // Get component metadata from registry
+          const componentMetadata = registry.componentList.get(content.name);
+          if (!componentMetadata) {
+            continue;
+          }
+
+          // Add to interactables
+          const interactableId = addInteractableComponent({
+            name: content.name,
+            description: componentMetadata.description,
+            component: componentMetadata.component,
+            props: content.props ?? {},
+            propsSchema: componentMetadata.propsSchema,
+          });
+
+          // Track that we've added this component ID
+          addedToInteractablesRef.current.add(componentId);
+
+          // Use the generated interactable ID instead of the component ID for tracking
+          // This ensures consistency with the interactable system
+          if (interactableId !== componentId) {
+            addedToInteractablesRef.current.add(interactableId);
+          }
+        }
+      }
+    }
+  }, [
+    autoAddToInteractables,
+    threadState,
+    addInteractableComponent,
+    getInteractableComponent,
+    registry.componentList,
+  ]);
 
   // Keep a live snapshot of the threadMap for callbacks without forcing them to
   // re-create on every stream state update.
