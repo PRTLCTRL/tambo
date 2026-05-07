@@ -13,13 +13,15 @@
  */
 
 import { parse } from "partial-json";
-import React, { type FC, useMemo, useContext } from "react";
+import React, { type FC, useMemo, useContext, useEffect, useRef } from "react";
 import { TamboRegistryContext } from "../../providers/tambo-registry-provider";
+import { useTamboInteractable } from "../../providers/tambo-interactable-provider";
 import { isStandardSchema } from "../../schema";
 import { isPromise } from "../../util/is-promise";
 import { getComponentFromRegistry } from "../../util/registry";
 import type { TamboComponentContent } from "../types/message";
 import { ComponentContentProvider } from "../utils/component-renderer";
+import { useTamboConfig } from "../providers/tambo-v1-provider";
 
 export interface ComponentRendererProps {
   /**
@@ -76,6 +78,13 @@ export const ComponentRenderer: FC<ComponentRendererProps> = ({
   fallback = null,
 }) => {
   const registry = useContext(TamboRegistryContext);
+  const config = useTamboConfig();
+  const {
+    addInteractableComponent,
+    getInteractableComponent,
+    updateInteractableComponentProps,
+  } = useTamboInteractable();
+  const interactableIdRef = useRef<string | null>(null);
 
   // Memoize the rendered element - only recreates when props change
   const element = useMemo(() => {
@@ -136,6 +145,84 @@ export const ComponentRenderer: FC<ComponentRendererProps> = ({
     messageId,
     threadId,
     registry.componentList,
+  ]);
+
+  // Automatically add to interactables when enabled
+  useEffect(() => {
+    if (
+      config.autoAddToInteractables &&
+      element !== null &&
+      interactableIdRef.current === null
+    ) {
+      try {
+        const registeredComponent = getComponentFromRegistry(
+          content.name,
+          registry.componentList,
+        );
+
+        const parsedProps = parse(JSON.stringify(content.props ?? {}));
+
+        const interactableId = addInteractableComponent({
+          name: content.name,
+          description:
+            registeredComponent.description ?? `Generated ${content.name}`,
+          component: registeredComponent.component,
+          props: parsedProps,
+          propsSchema: registeredComponent.props,
+        });
+
+        interactableIdRef.current = interactableId;
+      } catch (error) {
+        console.error(
+          "[ComponentRenderer] Failed to add component to interactables",
+          {
+            componentId: content.id,
+            componentName: content.name,
+            error,
+          },
+        );
+      }
+    }
+  }, [
+    config.autoAddToInteractables,
+    content.id,
+    content.name,
+    content.props,
+    element,
+    registry.componentList,
+    addInteractableComponent,
+  ]);
+
+  // Update interactable props when content props change
+  useEffect(() => {
+    if (
+      config.autoAddToInteractables &&
+      interactableIdRef.current !== null &&
+      element !== null
+    ) {
+      const existingInteractable = getInteractableComponent(
+        interactableIdRef.current,
+      );
+      if (existingInteractable) {
+        const parsedProps = parse(JSON.stringify(content.props ?? {}));
+        const propsChanged = Object.entries(parsedProps).some(
+          ([key, value]) => existingInteractable.props[key] !== value,
+        );
+
+        if (propsChanged) {
+          updateInteractableComponentProps(
+            interactableIdRef.current,
+            parsedProps,
+          );
+        }
+      }
+    }
+  }, [
+    config.autoAddToInteractables,
+    content.props,
+    element,
+    getInteractableComponent,
+    updateInteractableComponentProps,
   ]);
 
   if (element === null) {
