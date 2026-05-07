@@ -582,7 +582,7 @@ describe("useTamboStreamStatus", () => {
   describe("Array Support", () => {
     it("should provide completedItems and streamingItems for arrays", () => {
       interface ArrayProps {
-        items: Array<{ id: string; name: string }>;
+        items: { id: string; name: string }[];
       }
 
       // Start with empty array
@@ -691,12 +691,12 @@ describe("useTamboStreamStatus", () => {
   describe("Mixed Nested Structures", () => {
     it("should handle arrays of objects with nested properties", () => {
       interface ComplexProps {
-        users: Array<{
+        users: {
           profile: {
             name: string;
             email: string;
           };
-        }>;
+        }[];
       }
 
       const user1 = {
@@ -714,9 +714,7 @@ describe("useTamboStreamStatus", () => {
       const threadState = createThreadState([message]);
       mockUseStreamState.mockReturnValue(createStreamState(threadState));
 
-      const { result } = renderHook(() =>
-        useTamboStreamStatus<ComplexProps>(),
-      );
+      const { result } = renderHook(() => useTamboStreamStatus<ComplexProps>());
 
       expect(result.current.propStatus.users?.isSuccess).toBe(true);
       expect(result.current.propStatus.users?.completedItems).toHaveLength(2);

@@ -55,10 +55,10 @@ export interface StreamStatus {
 /**
  * Streaming status flags for individual component props.
  * Tracks the state of each prop as it streams from the LLM.
- * 
+ *
  * For nested objects, each nested property will have its own PropStatus
  * accessible as a property of the parent's PropStatus.
- * 
+ *
  * For arrays, additional completedItems and streamingItems fields
  * provide access to items based on their streaming state.
  */
@@ -108,6 +108,7 @@ export interface PropStatus {
 
 /**
  * Checks if a value has content (not undefined, null, or empty string/array/object).
+ * For objects, recursively checks if any nested value has content.
  * @param value - The value to check
  * @returns True if the value has content
  */
@@ -115,11 +116,16 @@ function hasContent(value: unknown): boolean {
   if (value === undefined || value === null || value === "") {
     return false;
   }
-  if (Array.isArray(value) && value.length === 0) {
-    return false;
+  if (Array.isArray(value)) {
+    return value.length > 0 && value.some((item) => hasContent(item));
   }
-  if (typeof value === "object" && Object.keys(value).length === 0) {
-    return false;
+  if (typeof value === "object") {
+    const entries = Object.entries(value);
+    if (entries.length === 0) {
+      return false;
+    }
+    // For objects, check if any nested property has content
+    return entries.some(([, nestedValue]) => hasContent(nestedValue));
   }
   return true;
 }
@@ -144,11 +150,15 @@ function buildStartedPropsMap(props: unknown, prefix = ""): Set<string> {
       started.add(path);
 
       // For objects (not arrays), recursively track nested properties
-      if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+      if (
+        typeof value === "object" &&
+        value !== null &&
+        !Array.isArray(value)
+      ) {
         const nestedStarted = buildStartedPropsMap(value, path);
         nestedStarted.forEach((nestedPath) => started.add(nestedPath));
       }
-      
+
       // For arrays, track individual items
       if (Array.isArray(value)) {
         value.forEach((item, index) => {

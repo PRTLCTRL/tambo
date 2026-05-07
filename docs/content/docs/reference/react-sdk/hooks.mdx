@@ -407,6 +407,70 @@ function MyComponent(props: MyProps) {
 }
 ```
 
+### Nested Object Tracking
+
+For components with nested object props, you can track the streaming status of individual nested properties:
+
+```tsx
+interface UserCardProps {
+  user: {
+    name: string;
+    email: string;
+    profile: {
+      bio: string;
+    };
+  };
+}
+
+function UserCard(props: UserCardProps) {
+  const { propStatus } = useTamboStreamStatus<UserCardProps>();
+
+  return (
+    <div>
+      {propStatus.user?.name?.isStreaming ? (
+        <Skeleton className="h-6 w-32" />
+      ) : (
+        <h3>{props.user.name}</h3>
+      )}
+
+      {propStatus.user?.profile?.bio?.isSuccess && (
+        <p>{props.user.profile.bio}</p>
+      )}
+    </div>
+  );
+}
+```
+
+### Array Item Tracking
+
+For array props, `propStatus` includes `completedItems` and `streamingItems` fields to access items based on their streaming state:
+
+```tsx
+interface TaskListProps {
+  tasks: { id: string; title: string; completed: boolean }[];
+}
+
+function TaskList(props: TaskListProps) {
+  const { propStatus } = useTamboStreamStatus<TaskListProps>();
+
+  return (
+    <ul>
+      {propStatus.tasks?.completedItems?.map((task) => (
+        <li key={task.id}>
+          <input type="checkbox" checked={task.completed} />
+          {task.title}
+        </li>
+      ))}
+      {propStatus.tasks?.streamingItems?.map((task, index) => (
+        <li key={`streaming-${index}`} className="opacity-50">
+          <Skeleton className="h-4 w-full" />
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
 ### Return Values
 
 | Value          | Type                                                      | Description                                                                                                                                    |
