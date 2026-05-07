@@ -353,4 +353,26 @@ describe("TamboProvider", () => {
       "contextAttachments",
     ]);
   });
+
+  it("passes autoRegisterInteractables to config when provided", () => {
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <TamboProvider apiKey="test-api-key" autoRegisterInteractables={true}>
+        {children}
+      </TamboProvider>
+    );
+
+    const { result } = renderHook(() => useTamboConfig(), { wrapper });
+
+    expect(result.current.autoRegisterInteractables).toBe(true);
+  });
+
+  it("defaults autoRegisterInteractables to undefined when not provided", () => {
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <TamboProvider apiKey="test-api-key">{children}</TamboProvider>
+    );
+
+    const { result } = renderHook(() => useTamboConfig(), { wrapper });
+
+    expect(result.current.autoRegisterInteractables).toBeUndefined();
+  });
 });

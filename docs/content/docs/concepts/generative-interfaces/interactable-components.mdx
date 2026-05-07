@@ -37,6 +37,31 @@ When you wrap a component with `withTamboInteractable`, Tambo creates an automat
 
 Place these wherever you normally would within the application to enable a traditional, statically-organized, user interface enhanced with AI capabilities.
 
+## Automatic Interactables
+
+If you want all AI-generated components to automatically become interactable (allowing Tambo to update previously-generated components rather than only creating new ones), enable the `autoRegisterInteractables` setting on `TamboProvider`:
+
+```tsx
+<TamboProvider
+  apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
+  components={[WeatherCard, StockChart, TaskList]}
+  autoRegisterInteractables={true}
+>
+  <ChatInterface />
+</TamboProvider>
+```
+
+When enabled, every component that Tambo generates in response to messages is automatically registered as an interactable. This means Tambo can later update any component it previously created, without you having to manually wrap them with `withTamboInteractable`.
+
+This is particularly useful when you want a more dynamic interface where users can ask Tambo to modify components it created earlier in the conversation. For example:
+
+- User: "Show me a weather card for San Francisco"
+  - Tambo generates a WeatherCard component
+- User: "Change that to New York instead"
+  - Tambo updates the same WeatherCard component's city prop
+
+Without `autoRegisterInteractables`, the second request would generate a new component rather than updating the existing one.
+
 <LearnMore
   title="How to register Interactable components"
   description="Step-by-step guide to making your components Interactable"
