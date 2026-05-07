@@ -410,6 +410,183 @@ describe("useTamboStreamStatus", () => {
     });
   });
 
+  describe("Nested Objects", () => {
+    it("should track nested object prop streaming status", () => {
+      interface NestedProps {
+        user: {
+          name: string;
+          email: string;
+        };
+      }
+
+      const componentContent = createComponentContent({
+        props: { user: { name: "John", email: "" } },
+        streamingState: "streaming",
+      });
+      const message = createMessage(componentContent);
+      const threadState = createThreadState([message]);
+      mockUseStreamState.mockReturnValue(createStreamState(threadState));
+
+      const { result } = renderHook(() =>
+        useTamboStreamStatus<NestedProps>(),
+      );
+
+      const userStatus = result.current.propStatus.user as any;
+      expect(userStatus).toBeDefined();
+      expect(userStatus.name?.isStreaming).toBe(true);
+      expect(userStatus.email?.isPending).toBe(true);
+    });
+
+    it("should mark all nested fields as complete when streaming is done", () => {
+      interface NestedProps {
+        user: {
+          name: string;
+          email: string;
+        };
+      }
+
+      const componentContent = createComponentContent({
+        props: { user: { name: "John Doe", email: "john@example.com" } },
+        streamingState: "done",
+      });
+      const message = createMessage(componentContent);
+      const threadState = createThreadState([message]);
+      mockUseStreamState.mockReturnValue(createStreamState(threadState));
+
+      const { result } = renderHook(() =>
+        useTamboStreamStatus<NestedProps>(),
+      );
+
+      const userStatus = result.current.propStatus.user as any;
+      expect(userStatus.name?.isSuccess).toBe(true);
+      expect(userStatus.email?.isSuccess).toBe(true);
+      expect(userStatus.isSuccess).toBe(true);
+    });
+
+    it("should track deeply nested objects", () => {
+      interface DeepProps {
+        data: {
+          user: {
+            profile: {
+              name: string;
+            };
+          };
+        };
+      }
+
+      const componentContent = createComponentContent({
+        props: {
+          data: {
+            user: {
+              profile: {
+                name: "Alice",
+              },
+            },
+          },
+        },
+        streamingState: "streaming",
+      });
+      const message = createMessage(componentContent);
+      const threadState = createThreadState([message]);
+      mockUseStreamState.mockReturnValue(createStreamState(threadState));
+
+      const { result } = renderHook(() => useTamboStreamStatus<DeepProps>());
+
+      const dataStatus = result.current.propStatus.data as any;
+      expect(dataStatus).toBeDefined();
+      expect(dataStatus.user).toBeDefined();
+      expect(dataStatus.user.profile).toBeDefined();
+      expect(dataStatus.user.profile.name?.isStreaming).toBe(true);
+    });
+  });
+
+  describe("Array Props", () => {
+    it("should track array streaming with completedItems and streamingItems", () => {
+      interface ArrayProps {
+        items: string[];
+      }
+
+      const componentContent = createComponentContent({
+        props: { items: ["item1", "item2", "item3"] },
+        streamingState: "streaming",
+      });
+      const message = createMessage(componentContent);
+      const threadState = createThreadState([message]);
+      mockUseStreamState.mockReturnValue(createStreamState(threadState));
+
+      const { result } = renderHook(() => useTamboStreamStatus<ArrayProps>());
+
+      const itemsStatus = result.current.propStatus.items as any;
+      expect(itemsStatus).toBeDefined();
+      expect(itemsStatus.isStreaming).toBe(true);
+      expect(itemsStatus.completedItems).toEqual(["item1", "item2"]);
+      expect(itemsStatus.streamingItems).toEqual(["item3"]);
+    });
+
+    it("should show all items as completed when streaming is done", () => {
+      interface ArrayProps {
+        items: string[];
+      }
+
+      const componentContent = createComponentContent({
+        props: { items: ["item1", "item2", "item3"] },
+        streamingState: "done",
+      });
+      const message = createMessage(componentContent);
+      const threadState = createThreadState([message]);
+      mockUseStreamState.mockReturnValue(createStreamState(threadState));
+
+      const { result } = renderHook(() => useTamboStreamStatus<ArrayProps>());
+
+      const itemsStatus = result.current.propStatus.items as any;
+      expect(itemsStatus.isSuccess).toBe(true);
+      expect(itemsStatus.completedItems).toEqual(["item1", "item2", "item3"]);
+      expect(itemsStatus.streamingItems).toEqual([]);
+    });
+
+    it("should handle empty arrays", () => {
+      interface ArrayProps {
+        items: string[];
+      }
+
+      const componentContent = createComponentContent({
+        props: { items: [] },
+        streamingState: "streaming",
+      });
+      const message = createMessage(componentContent);
+      const threadState = createThreadState([message]);
+      mockUseStreamState.mockReturnValue(createStreamState(threadState));
+
+      const { result } = renderHook(() => useTamboStreamStatus<ArrayProps>());
+
+      const itemsStatus = result.current.propStatus.items as any;
+      expect(itemsStatus.isStreaming).toBe(true);
+      expect(itemsStatus.completedItems).toEqual([]);
+      expect(itemsStatus.streamingItems).toEqual([]);
+    });
+
+    it("should handle single-item arrays", () => {
+      interface ArrayProps {
+        items: string[];
+      }
+
+      const componentContent = createComponentContent({
+        props: { items: ["item1"] },
+        streamingState: "streaming",
+      });
+      const message = createMessage(componentContent);
+      const threadState = createThreadState([message]);
+      mockUseStreamState.mockReturnValue(createStreamState(threadState));
+
+      const { result } = renderHook(() => useTamboStreamStatus<ArrayProps>());
+
+      const itemsStatus = result.current.propStatus.items as any;
+      expect(itemsStatus.isStreaming).toBe(true);
+      expect(itemsStatus.completedItems).toEqual([]);
+      expect(itemsStatus.streamingItems).toEqual(["item1"]);
+    });
+  });
+
   describe("Edge Cases", () => {
     it("should handle missing component gracefully", () => {
       const threadState = createThreadState([

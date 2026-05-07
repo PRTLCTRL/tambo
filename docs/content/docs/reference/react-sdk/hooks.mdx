@@ -414,6 +414,79 @@ function MyComponent(props: MyProps) {
 | `streamStatus` | [`StreamStatus`](/reference/react-sdk/types#streamstatus) | Overall streaming status for the component                                                                                                     |
 | `propStatus`   | `Partial<Record<keyof Props, PropStatus>>`                | Per-prop streaming status. Keys are absent until the prop receives its first token. See [`PropStatus`](/reference/react-sdk/types#propstatus). |
 
+### Nested Object Tracking
+
+For props with nested objects, `propStatus` includes nested status fields. You can track the streaming status of individual nested properties:
+
+```tsx
+interface UserProfileProps {
+  user: {
+    name: string;
+    email: string;
+    profile: {
+      bio: string;
+    };
+  };
+}
+
+function UserProfile(props: UserProfileProps) {
+  const { propStatus } = useTamboStreamStatus<UserProfileProps>();
+
+  return (
+    <div>
+      <h2 className={(propStatus.user as any)?.name?.isStreaming ? "animate-pulse" : ""}>
+        {props.user.name}
+      </h2>
+      <p className={(propStatus.user as any)?.email?.isStreaming ? "animate-pulse" : ""}>
+        {props.user.email}
+      </p>
+      <p className={(propStatus.user as any)?.profile?.bio?.isStreaming ? "animate-pulse" : ""}>
+        {props.user.profile.bio}
+      </p>
+    </div>
+  );
+}
+```
+
+### Array Tracking with Completed Items
+
+For array props, `propStatus` includes `completedItems` and `streamingItems` arrays. This allows you to display only the items that have finished streaming:
+
+```tsx
+interface TodoListProps {
+  todos: Array<{ id: string; title: string; completed: boolean }>;
+}
+
+function TodoList(props: TodoListProps) {
+  const { propStatus } = useTamboStreamStatus<TodoListProps>();
+
+  const completedTodos = (propStatus.todos?.completedItems as typeof props.todos) ?? [];
+  const streamingTodos = (propStatus.todos?.streamingItems as typeof props.todos) ?? [];
+
+  return (
+    <div>
+      <h3>Completed Items:</h3>
+      <ul>
+        {completedTodos.map(todo => (
+          <li key={todo.id}>{todo.title}</li>
+        ))}
+      </ul>
+      
+      {streamingTodos.length > 0 && (
+        <>
+          <h3>Currently Streaming:</h3>
+          <ul>
+            {streamingTodos.map(todo => (
+              <li key={todo.id} className="animate-pulse">{todo.title}</li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+```
+
 <Callout type="info">
   This hook only works inside components rendered via `ComponentRenderer`. The
   renderer provides the necessary context for tracking streaming state.
