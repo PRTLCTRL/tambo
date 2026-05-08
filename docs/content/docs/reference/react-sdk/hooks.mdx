@@ -384,7 +384,7 @@ function EditableCard({ title: initialTitle }: { title: string }) {
 
 ## useTamboStreamStatus
 
-Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity.
+Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity, including support for nested objects and arrays.
 
 **Important**: Props update repeatedly during streaming and may be partial. Use `propStatus.<field>?.isSuccess` before treating a prop as complete.
 
@@ -417,6 +417,78 @@ function MyComponent(props: MyProps) {
 <Callout type="info">
   This hook only works inside components rendered via `ComponentRenderer`. The
   renderer provides the necessary context for tracking streaming state.
+</Callout>
+
+### Nested Object Status Tracking
+
+For props with nested objects, `propStatus` mirrors the structure with nested status objects:
+
+```tsx
+interface UserCardProps {
+  user: {
+    name: string;
+    email: string;
+    address: {
+      city: string;
+      country: string;
+    };
+  };
+}
+
+function UserCard({ user }: UserCardProps) {
+  const { propStatus } = useTamboStreamStatus<UserCardProps>();
+
+  return (
+    <div>
+      <h2 className={propStatus.user?.name?.isStreaming ? "animate-pulse" : ""}>
+        {user?.name}
+      </h2>
+      <p className={propStatus.user?.email?.isStreaming ? "animate-pulse" : ""}>
+        {user?.email}
+      </p>
+      <p className={propStatus.user?.address?.city?.isStreaming ? "animate-pulse" : ""}>
+        {user?.address?.city}
+      </p>
+    </div>
+  );
+}
+```
+
+### Array Field Status Tracking
+
+For array props, `propStatus` includes `completedItems` and `streamingItems`:
+
+```tsx
+interface ListProps {
+  items: Array<{ id: string; text: string }>;
+}
+
+function StreamingList({ items }: ListProps) {
+  const { propStatus } = useTamboStreamStatus<ListProps>();
+
+  const completedCount = propStatus.items?.completedItems?.length ?? 0;
+  const streamingCount = propStatus.items?.streamingItems?.length ?? 0;
+
+  return (
+    <div>
+      <p>Completed: {completedCount}, Streaming: {streamingCount}</p>
+      <ul>
+        {propStatus.items?.completedItems?.map((item: any) => (
+          <li key={item.id}>{item.text}</li>
+        ))}
+        {propStatus.items?.streamingItems?.map((item: any) => (
+          <li key={item.id} className="animate-pulse">
+            {item.text}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+```
+
+<Callout type="info">
+  When streaming is done, all items are in `completedItems`. When streaming is active, all items are in `streamingItems`. When pending, both arrays are empty.
 </Callout>
 
 ## useTamboSuggestions
