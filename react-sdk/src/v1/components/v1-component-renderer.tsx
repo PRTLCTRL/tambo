@@ -13,8 +13,9 @@
  */
 
 import { parse } from "partial-json";
-import React, { type FC, useMemo, useContext } from "react";
+import React, { type FC, useMemo, useContext, useEffect, useRef } from "react";
 import { TamboRegistryContext } from "../../providers/tambo-registry-provider";
+import { useTamboInteractable } from "../../providers/tambo-interactable-provider";
 import { isStandardSchema } from "../../schema";
 import { isPromise } from "../../util/is-promise";
 import { getComponentFromRegistry } from "../../util/registry";
@@ -76,6 +77,47 @@ export const ComponentRenderer: FC<ComponentRendererProps> = ({
   fallback = null,
 }) => {
   const registry = useContext(TamboRegistryContext);
+  const { autoInteractables, addInteractableComponent } =
+    useTamboInteractable();
+  const processedIds = useRef<Set<string>>(new Set());
+
+  // Automatically register component as interactable if enabled
+  useEffect(() => {
+    if (
+      autoInteractables &&
+      !processedIds.current.has(content.id) &&
+      content.streamingState === "complete"
+    ) {
+      try {
+        const registeredComponent = getComponentFromRegistry(
+          content.name,
+          registry.componentList,
+        );
+
+        addInteractableComponent({
+          name: content.name,
+          description: registeredComponent.description ?? "",
+          component: registeredComponent.component,
+          props: content.props ?? {},
+          propsSchema: registeredComponent.props,
+        });
+        processedIds.current.add(content.id);
+      } catch (error) {
+        console.warn(
+          `[ComponentRenderer] Failed to auto-register interactable component ${content.name}:`,
+          error,
+        );
+      }
+    }
+  }, [
+    autoInteractables,
+    content.id,
+    content.name,
+    content.props,
+    content.streamingState,
+    addInteractableComponent,
+    registry.componentList,
+  ]);
 
   // Memoize the rendered element - only recreates when props change
   const element = useMemo(() => {
