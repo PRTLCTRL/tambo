@@ -1,5 +1,5 @@
 import { act, render, renderHook, screen } from "@testing-library/react";
-import React from "react";
+import React, { useReducer } from "react";
 import { z } from "zod/v3";
 import { withTamboInteractable } from "../../hoc/with-tambo-interactable";
 import { useTamboInteractable } from "../../providers/tambo-interactable-provider";
@@ -10,6 +10,9 @@ import {
 } from "../../providers/tambo-registry-provider";
 import { TamboContextHelpersProvider } from "../../providers/tambo-context-helpers-provider";
 import { TamboInteractableProvider } from "../../providers/tambo-interactable-provider";
+import { TamboConfigContext } from "../providers/tambo-v1-provider";
+import { TamboStreamProvider } from "../providers/tambo-v1-stream-context";
+import { streamReducer, createInitialState, type StreamState } from "@tambo-ai/client";
 
 // Minimal registry mock that captures registered tools
 function createMockRegistry() {
@@ -217,5 +220,173 @@ describe("V1 Interactables Integration", () => {
 
     // The interactable should reflect updated props
     expect(screen.getByTestId("count")).toHaveTextContent("42");
+  });
+
+  describe("autoAddComponentsToInteractables", () => {
+    it("automatically adds AI-generated components to interactables when enabled", () => {
+      const mockRegistry = createMockRegistry();
+
+      // Register a test component in the registry
+      const TestCard: React.FC<{ title: string }> = ({ title }) => (
+        <div>{title}</div>
+      );
+
+      mockRegistry.value.componentList = {
+        TestCard: {
+          name: "TestCard",
+          description: "A test card",
+          component: TestCard,
+          props: z.object({ title: z.string() }),
+        },
+      };
+
+      // Create a stream state with a message containing a component
+      const initialState: StreamState = {
+        currentThreadId: "thread-1",
+        threadMap: {
+          "thread-1": {
+            threadId: "thread-1",
+            messages: [
+              {
+                id: "msg-1",
+                role: "assistant",
+                content: [
+                  {
+                    type: "component",
+                    id: "comp-1",
+                    name: "TestCard",
+                    props: { title: "Auto-added" },
+                    state: {},
+                    streamingState: "complete",
+                  },
+                ],
+                createdAt: new Date().toISOString(),
+              },
+            ],
+            isStreamActive: false,
+          },
+        },
+      };
+
+      function WrapperWithConfig({ children }: { children: React.ReactNode }) {
+        const [state, dispatch] = useReducer(streamReducer, initialState);
+        
+        return (
+          <TamboConfigContext.Provider
+            value={{ autoAddComponentsToInteractables: true }}
+          >
+            <TamboRegistryContext.Provider value={mockRegistry.value}>
+              <TamboContextHelpersProvider>
+                <TamboStreamProvider
+                  state={state}
+                  dispatch={dispatch}
+                  threadManagement={{
+                    initThread: jest.fn(),
+                    switchThread: jest.fn(),
+                    startNewThread: jest.fn(() => "new-thread"),
+                  }}
+                >
+                  {children}
+                </TamboStreamProvider>
+              </TamboContextHelpersProvider>
+            </TamboRegistryContext.Provider>
+          </TamboConfigContext.Provider>
+        );
+      }
+
+      const { result } = renderHook(() => useTamboInteractable(), {
+        wrapper: WrapperWithConfig,
+      });
+
+      // Wait for the effect to run
+      act(() => {
+        // Force a re-render to ensure effects run
+      });
+
+      // The component should have been automatically added to interactables
+      expect(result.current.interactableComponents.length).toBeGreaterThan(0);
+      const addedComponent = result.current.interactableComponents.find(
+        (c) => c.name === "TestCard",
+      );
+      expect(addedComponent).toBeDefined();
+      expect(addedComponent?.props).toEqual({ title: "Auto-added" });
+    });
+
+    it("does not auto-add components when feature is disabled", () => {
+      const mockRegistry = createMockRegistry();
+
+      const TestCard: React.FC<{ title: string }> = ({ title }) => (
+        <div>{title}</div>
+      );
+
+      mockRegistry.value.componentList = {
+        TestCard: {
+          name: "TestCard",
+          description: "A test card",
+          component: TestCard,
+          props: z.object({ title: z.string() }),
+        },
+      };
+
+      const initialState: StreamState = {
+        currentThreadId: "thread-1",
+        threadMap: {
+          "thread-1": {
+            threadId: "thread-1",
+            messages: [
+              {
+                id: "msg-1",
+                role: "assistant",
+                content: [
+                  {
+                    type: "component",
+                    id: "comp-1",
+                    name: "TestCard",
+                    props: { title: "Not auto-added" },
+                    state: {},
+                    streamingState: "complete",
+                  },
+                ],
+                createdAt: new Date().toISOString(),
+              },
+            ],
+            isStreamActive: false,
+          },
+        },
+      };
+
+      function WrapperWithConfig({ children }: { children: React.ReactNode }) {
+        const [state, dispatch] = useReducer(streamReducer, initialState);
+        
+        return (
+          <TamboConfigContext.Provider
+            value={{ autoAddComponentsToInteractables: false }}
+          >
+            <TamboRegistryContext.Provider value={mockRegistry.value}>
+              <TamboContextHelpersProvider>
+                <TamboStreamProvider
+                  state={state}
+                  dispatch={dispatch}
+                  threadManagement={{
+                    initThread: jest.fn(),
+                    switchThread: jest.fn(),
+                    startNewThread: jest.fn(() => "new-thread"),
+                  }}
+                >
+                  {children}
+                </TamboStreamProvider>
+              </TamboContextHelpersProvider>
+            </TamboRegistryContext.Provider>
+          </TamboConfigContext.Provider>
+        );
+      }
+
+      const { result } = renderHook(() => useTamboInteractable(), {
+        wrapper: WrapperWithConfig,
+      });
+
+      // Components should NOT be auto-added
+      expect(result.current.interactableComponents).toHaveLength(0);
+    });
   });
 });

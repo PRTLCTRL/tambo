@@ -23,6 +23,10 @@ import { makeJsonSchemaPartial, schemaToJsonSchema } from "../schema";
 import { assertValidName } from "../util/validate-component-name";
 import { useTamboRegistry } from "./tambo-registry-provider";
 import { useTamboContextHelpers } from "./tambo-context-helpers-provider";
+import { getComponentFromRegistry } from "../util/registry";
+import { useTamboConfig } from "../v1/providers/tambo-v1-provider";
+import { useStreamState } from "../v1/providers/tambo-v1-stream-context";
+import type { TamboComponentContent } from "../v1/types/message";
 
 const TamboInteractableContext = createContext<TamboInteractableContext>({
   interactableComponents: [],
@@ -40,6 +44,85 @@ const TamboInteractableContext = createContext<TamboInteractableContext>({
 
 /** Synthetic owner ID used to track global interactable tools in the registry. */
 const GLOBAL_INTERACTABLE_OWNER = "__interactable_global__";
+
+/**
+ * Internal component that automatically adds AI-generated components to interactables
+ * when autoAddComponentsToInteractables is enabled.
+ */
+function AutoAddComponentsToInteractables(): null {
+  const config = useTamboConfig();
+  const streamState = useStreamState();
+  const registry = useTamboRegistry();
+  const { addInteractableComponent } = useTamboInteractable();
+  
+  const addedComponentsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!config.autoAddComponentsToInteractables) {
+      return;
+    }
+
+    const currentThreadId = streamState.currentThreadId;
+    if (!currentThreadId) {
+      return;
+    }
+
+    const threadState = streamState.threadMap[currentThreadId];
+    if (!threadState) {
+      return;
+    }
+
+    const assistantMessages = threadState.messages.filter(
+      (msg) => msg.role === "assistant",
+    );
+
+    for (const message of assistantMessages) {
+      for (const content of message.content) {
+        if (content.type === "component") {
+          const componentContent = content as TamboComponentContent;
+          const uniqueKey = `${message.id}-${componentContent.id}`;
+
+          if (!addedComponentsRef.current.has(uniqueKey)) {
+            try {
+              const registeredComponent = getComponentFromRegistry(
+                componentContent.name,
+                registry.componentList,
+              );
+
+              addInteractableComponent({
+                name: componentContent.name,
+                description:
+                  registeredComponent.description ||
+                  `Interactive ${componentContent.name} component`,
+                component: registeredComponent.component,
+                props: componentContent.props || {},
+                propsSchema: registeredComponent.props,
+                state: componentContent.state,
+                stateSchema: registeredComponent.state,
+                annotations: registeredComponent.annotations,
+              });
+
+              addedComponentsRef.current.add(uniqueKey);
+            } catch (error) {
+              console.warn(
+                `Failed to auto-add component ${componentContent.name} to interactables:`,
+                error,
+              );
+            }
+          }
+        }
+      }
+    }
+  }, [
+    config.autoAddComponentsToInteractables,
+    streamState.currentThreadId,
+    streamState.threadMap,
+    registry.componentList,
+    addInteractableComponent,
+  ]);
+
+  return null;
+}
 
 /**
  * The TamboInteractableProvider manages a list of components that are currently
@@ -562,6 +645,7 @@ export const TamboInteractableProvider: React.FC<PropsWithChildren> = ({
 
   return (
     <TamboInteractableContext.Provider value={value}>
+      <AutoAddComponentsToInteractables />
       {children}
     </TamboInteractableContext.Provider>
   );
