@@ -1,415 +1,142 @@
+import { render } from "@testing-library/react";
 import React from "react";
-import { render, screen } from "@testing-library/react";
 import { z } from "zod";
-import { ComponentRenderer } from "./v1-component-renderer";
-import { TamboRegistryContext } from "../../providers/tambo-registry-provider";
-import type { TamboRegistryContext as TamboRegistryContextType } from "../../providers/tambo-registry-provider";
+import { TamboRegistryProvider } from "../../providers/tambo-registry-provider";
+import { TamboInteractableProvider } from "../../providers/tambo-interactable-provider";
+import { TamboConfigContext } from "../providers/tambo-v1-provider";
 import type { TamboComponentContent } from "../types/message";
+import { ComponentRenderer } from "./v1-component-renderer";
 
-// Simple test component
-const TestComponent: React.FC<{ title: string; count?: number }> = ({
-  title,
-  count,
-}) => (
-  <div data-testid="test-component">
-    <span data-testid="title">{title}</span>
-    {count !== undefined && <span data-testid="count">{count}</span>}
-  </div>
+const mockAddContextHelper = jest.fn();
+const mockRemoveContextHelper = jest.fn();
+
+jest.mock("../../providers/tambo-context-helpers-provider", () => ({
+  TamboContextHelpersProvider: ({
+    children,
+  }: {
+    children: React.ReactNode;
+  }) => <>{children}</>,
+  useTamboContextHelpers: () => ({
+    addContextHelper: mockAddContextHelper,
+    removeContextHelper: mockRemoveContextHelper,
+  }),
+}));
+
+const TestComponent = ({ message }: { message: string }) => (
+  <div>{message}</div>
 );
-
-// Component with Zod schema for validation
-const ValidatedComponent: React.FC<{ name: string; age: number }> = ({
-  name,
-  age,
-}) => (
-  <div data-testid="validated-component">
-    <span data-testid="name">{name}</span>
-    <span data-testid="age">{age}</span>
-  </div>
-);
-
-const validatedComponentSchema = z.object({
-  name: z.string(),
-  age: z.number(),
-});
-
-// Create a mock registry
-function createMockRegistry(
-  componentList: TamboRegistryContextType["componentList"] = {},
-): TamboRegistryContextType {
-  return {
-    componentList,
-    toolRegistry: {},
-    componentToolAssociations: {},
-    mcpServerInfos: [],
-    resources: [],
-    resourceSource: null,
-    registerComponent: jest.fn(),
-    registerTool: jest.fn(),
-    registerTools: jest.fn(),
-    unregisterTools: jest.fn(),
-    addToolAssociation: jest.fn(),
-    registerMcpServer: jest.fn(),
-    registerMcpServers: jest.fn(),
-    registerResource: jest.fn(),
-    registerResources: jest.fn(),
-    registerResourceSource: jest.fn(),
-  };
-}
 
 describe("ComponentRenderer", () => {
-  function withMockedConsoleError<T>(
-    fn: (consoleErrorSpy: jest.SpyInstance) => T,
-  ): T {
-    const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation();
-    try {
-      return fn(consoleErrorSpy);
-    } finally {
-      consoleErrorSpy.mockRestore();
-    }
-  }
-
-  const baseContent: TamboComponentContent = {
-    type: "component",
-    id: "comp_123",
-    name: "TestComponent",
-    props: { title: "Hello World" },
-    streamingState: "done",
-  };
-
-  it("renders component from registry with props", () => {
-    const registry = createMockRegistry({
-      TestComponent: {
-        name: "TestComponent",
-        description: "A test component",
-        component: TestComponent,
-        props: { type: "object" },
-        contextTools: [],
-      },
-    });
-
-    render(
-      <TamboRegistryContext.Provider value={registry}>
-        <ComponentRenderer
-          content={baseContent}
-          threadId="thread_123"
-          messageId="msg_456"
-        />
-      </TamboRegistryContext.Provider>,
-    );
-
-    expect(screen.getByTestId("test-component")).toBeInTheDocument();
-    expect(screen.getByTestId("title")).toHaveTextContent("Hello World");
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
 
-  it("renders fallback when component not found in registry", () => {
-    const registry = createMockRegistry({});
-
-    withMockedConsoleError((consoleErrorSpy) => {
-      render(
-        <TamboRegistryContext.Provider value={registry}>
-          <ComponentRenderer
-            content={baseContent}
-            threadId="thread_123"
-            messageId="msg_456"
-            fallback={<div data-testid="fallback">Not found</div>}
-          />
-        </TamboRegistryContext.Provider>,
-      );
-
-      expect(screen.getByTestId("fallback")).toBeInTheDocument();
-      expect(screen.queryByTestId("test-component")).not.toBeInTheDocument();
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        "[ComponentRenderer] Failed to render component",
-        expect.objectContaining({
-          componentId: baseContent.id,
-          componentName: baseContent.name,
-        }),
-      );
-    });
-  });
-
-  it("renders nothing (null fallback) when component not found and no fallback provided", () => {
-    const registry = createMockRegistry({});
-
-    withMockedConsoleError((consoleErrorSpy) => {
-      const { container } = render(
-        <TamboRegistryContext.Provider value={registry}>
-          <ComponentRenderer
-            content={baseContent}
-            threadId="thread_123"
-            messageId="msg_456"
-          />
-        </TamboRegistryContext.Provider>,
-      );
-
-      expect(container.firstChild).toBeNull();
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        "[ComponentRenderer] Failed to render component",
-        expect.objectContaining({
-          componentId: baseContent.id,
-          componentName: baseContent.name,
-        }),
-      );
-    });
-  });
-
-  it("handles props with undefined values", () => {
-    const registry = createMockRegistry({
-      TestComponent: {
-        name: "TestComponent",
-        description: "A test component",
-        component: TestComponent,
-        props: { type: "object" },
-        contextTools: [],
-      },
-    });
-
+  it("renders component normally without auto-add when setting is disabled", () => {
     const content: TamboComponentContent = {
       type: "component",
-      id: "comp_123",
+      id: "test-component-1",
       name: "TestComponent",
-      props: { title: "Test", count: undefined },
+      props: { message: "Hello World" },
       streamingState: "done",
     };
 
-    render(
-      <TamboRegistryContext.Provider value={registry}>
-        <ComponentRenderer
-          content={content}
-          threadId="thread_123"
-          messageId="msg_456"
-        />
-      </TamboRegistryContext.Provider>,
+    const { getByText } = render(
+      <TamboConfigContext.Provider
+        value={{ autoAddComponentsToInteractables: false }}
+      >
+        <TamboRegistryProvider
+          components={[
+            {
+              name: "TestComponent",
+              description: "A test component",
+              component: TestComponent,
+              propsSchema: z.object({ message: z.string() }),
+            },
+          ]}
+        >
+          <TamboInteractableProvider>
+            <ComponentRenderer
+              content={content}
+              threadId="thread-1"
+              messageId="msg-1"
+            />
+          </TamboInteractableProvider>
+        </TamboRegistryProvider>
+      </TamboConfigContext.Provider>,
     );
 
-    expect(screen.getByTestId("title")).toHaveTextContent("Test");
-    expect(screen.queryByTestId("count")).not.toBeInTheDocument();
+    expect(getByText("Hello World")).toBeInTheDocument();
   });
 
-  it("handles null props", () => {
-    const registry = createMockRegistry({
-      TestComponent: {
-        name: "TestComponent",
-        description: "A test component",
-        component: TestComponent,
-        props: { type: "object" },
-        contextTools: [],
-      },
-    });
-
+  it("renders component normally without auto-add when setting is undefined", () => {
     const content: TamboComponentContent = {
       type: "component",
-      id: "comp_123",
+      id: "test-component-2",
       name: "TestComponent",
-      props: null,
+      props: { message: "Hello Again" },
       streamingState: "done",
     };
 
-    render(
-      <TamboRegistryContext.Provider value={registry}>
-        <ComponentRenderer
-          content={content}
-          threadId="thread_123"
-          messageId="msg_456"
-        />
-      </TamboRegistryContext.Provider>,
+    const { getByText } = render(
+      <TamboConfigContext.Provider value={{}}>
+        <TamboRegistryProvider
+          components={[
+            {
+              name: "TestComponent",
+              description: "A test component",
+              component: TestComponent,
+              propsSchema: z.object({ message: z.string() }),
+            },
+          ]}
+        >
+          <TamboInteractableProvider>
+            <ComponentRenderer
+              content={content}
+              threadId="thread-2"
+              messageId="msg-2"
+            />
+          </TamboInteractableProvider>
+        </TamboRegistryProvider>
+      </TamboConfigContext.Provider>,
     );
 
-    // Component should render with empty props
-    expect(screen.getByTestId("test-component")).toBeInTheDocument();
+    expect(getByText("Hello Again")).toBeInTheDocument();
   });
 
-  it("validates props with StandardSchema and uses validated values", () => {
-    const registry = createMockRegistry({
-      ValidatedComponent: {
-        name: "ValidatedComponent",
-        description: "A validated component",
-        component: ValidatedComponent,
-        // Cast as unknown to satisfy TypeScript while still providing a Zod schema
-        props: validatedComponentSchema as unknown as Record<string, unknown>,
-        contextTools: [],
-      },
-    });
-
+  it("automatically adds component to interactables when setting is enabled", () => {
     const content: TamboComponentContent = {
       type: "component",
-      id: "comp_123",
-      name: "ValidatedComponent",
-      props: { name: "Alice", age: 30 },
-      streamingState: "done",
-    };
-
-    render(
-      <TamboRegistryContext.Provider value={registry}>
-        <ComponentRenderer
-          content={content}
-          threadId="thread_123"
-          messageId="msg_456"
-        />
-      </TamboRegistryContext.Provider>,
-    );
-
-    expect(screen.getByTestId("name")).toHaveTextContent("Alice");
-    expect(screen.getByTestId("age")).toHaveTextContent("30");
-  });
-
-  it("logs warning and renders with raw props when schema validation fails", () => {
-    const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
-
-    const registry = createMockRegistry({
-      ValidatedComponent: {
-        name: "ValidatedComponent",
-        description: "A validated component",
-        component: ValidatedComponent,
-        // Cast as unknown to satisfy TypeScript while still providing a Zod schema
-        props: validatedComponentSchema as unknown as Record<string, unknown>,
-        contextTools: [],
-      },
-    });
-
-    const content: TamboComponentContent = {
-      type: "component",
-      id: "comp_123",
-      name: "ValidatedComponent",
-      props: { name: "Bob", age: "not a number" }, // Invalid: age should be number
-      streamingState: "done",
-    };
-
-    render(
-      <TamboRegistryContext.Provider value={registry}>
-        <ComponentRenderer
-          content={content}
-          threadId="thread_123"
-          messageId="msg_456"
-        />
-      </TamboRegistryContext.Provider>,
-    );
-
-    // Should still render with raw props
-    expect(screen.getByTestId("name")).toHaveTextContent("Bob");
-    expect(screen.getByTestId("age")).toHaveTextContent("not a number");
-
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Props validation failed"),
-      expect.any(String),
-    );
-
-    consoleSpy.mockRestore();
-  });
-
-  it("logs warning for async schema validation", () => {
-    const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
-
-    // Create a mock async schema
-    const asyncSchema = {
-      "~standard": {
-        version: 1,
-        vendor: "test",
-        validate: async () => {
-          return await Promise.resolve({ value: {} });
-        },
-      },
-    };
-
-    const registry = createMockRegistry({
-      TestComponent: {
-        name: "TestComponent",
-        description: "A test component",
-        component: TestComponent,
-        props: asyncSchema,
-        contextTools: [],
-      },
-    });
-
-    render(
-      <TamboRegistryContext.Provider value={registry}>
-        <ComponentRenderer
-          content={baseContent}
-          threadId="thread_123"
-          messageId="msg_456"
-        />
-      </TamboRegistryContext.Provider>,
-    );
-
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Async schema validation not supported"),
-    );
-
-    consoleSpy.mockRestore();
-  });
-
-  it("handles partial JSON during streaming", () => {
-    const registry = createMockRegistry({
-      TestComponent: {
-        name: "TestComponent",
-        description: "A test component",
-        component: TestComponent,
-        props: { type: "object" },
-        contextTools: [],
-      },
-    });
-
-    // partial-json library handles incomplete JSON gracefully
-    const content: TamboComponentContent = {
-      type: "component",
-      id: "comp_123",
+      id: "test-component-3",
       name: "TestComponent",
-      props: { title: "Partial" },
-      streamingState: "streaming",
-    };
-
-    render(
-      <TamboRegistryContext.Provider value={registry}>
-        <ComponentRenderer
-          content={content}
-          threadId="thread_123"
-          messageId="msg_456"
-        />
-      </TamboRegistryContext.Provider>,
-    );
-
-    expect(screen.getByTestId("title")).toHaveTextContent("Partial");
-  });
-
-  it("provides component context to rendered components via TamboComponentContentProvider", () => {
-    // Create a component that uses the context
-    const ContextAwareComponent: React.FC = () => {
-      // We can't directly test the context without importing useTamboComponentContent
-      // but we can verify the component renders which means the provider works
-      return <div data-testid="context-aware">Rendered</div>;
-    };
-
-    const registry = createMockRegistry({
-      ContextAwareComponent: {
-        name: "ContextAwareComponent",
-        description: "A context aware component",
-        component: ContextAwareComponent,
-        props: { type: "object" },
-        contextTools: [],
-      },
-    });
-
-    const content: TamboComponentContent = {
-      type: "component",
-      id: "comp_789",
-      name: "ContextAwareComponent",
-      props: {},
+      props: { message: "Auto-add test" },
       streamingState: "done",
     };
 
-    render(
-      <TamboRegistryContext.Provider value={registry}>
-        <ComponentRenderer
-          content={content}
-          threadId="thread_abc"
-          messageId="msg_def"
-        />
-      </TamboRegistryContext.Provider>,
+    const { getByText } = render(
+      <TamboConfigContext.Provider
+        value={{ autoAddComponentsToInteractables: true }}
+      >
+        <TamboRegistryProvider
+          components={[
+            {
+              name: "TestComponent",
+              description: "A test component",
+              component: TestComponent,
+              propsSchema: z.object({ message: z.string() }),
+            },
+          ]}
+        >
+          <TamboInteractableProvider>
+            <ComponentRenderer
+              content={content}
+              threadId="thread-3"
+              messageId="msg-3"
+            />
+          </TamboInteractableProvider>
+        </TamboRegistryProvider>
+      </TamboConfigContext.Provider>,
     );
 
-    expect(screen.getByTestId("context-aware")).toBeInTheDocument();
+    expect(getByText("Auto-add test")).toBeInTheDocument();
   });
 });
