@@ -160,7 +160,9 @@ export const ComponentRenderer: FC<ComponentRendererProps> = ({
           name: content.name,
           description: registeredComponent.description || "",
           component: registeredComponent.component,
-          props: (content.props as Record<string, unknown>) ?? ({} as Record<string, unknown>),
+          props:
+            (content.props as Record<string, unknown>) ??
+            ({} as Record<string, unknown>),
           propsSchema: registeredComponent.props,
         });
 
