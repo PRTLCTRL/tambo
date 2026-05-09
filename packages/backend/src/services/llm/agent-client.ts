@@ -3,6 +3,7 @@ import {
   EventType,
   HttpAgent,
   MessagesSnapshotEvent,
+  RunAgentResult,
   RunFinishedEvent,
   TextMessageContentEvent,
   TextMessageStartEvent,
@@ -34,6 +35,112 @@ import { EventHandlerParams, runStreamingAgent } from "./async-adapters";
 import { CompleteParams, LLMResponse } from "./llm-client";
 import { generateMessageId } from "./message-id-generator";
 
+/**
+ * Custom error class for agent protocol violations.
+ * Provides helpful guidance when custom agent endpoints don't conform to AG-UI protocol.
+ */
+class AgentProtocolError extends Error {
+  constructor(
+    message: string,
+    public readonly agentProviderType: AgentProviderType,
+    public readonly agentUrl: string,
+    public readonly cause?: unknown,
+  ) {
+    super(message);
+    this.name = "AgentProtocolError";
+  }
+}
+
+/**
+ * Wraps errors from agent execution with helpful context and guidance.
+ * Identifies common failure patterns and suggests fixes.
+ *
+ * @param error - The original error from the agent
+ * @param agentProviderType - The type of agent provider being used
+ * @param agentUrl - The URL of the custom agent endpoint
+ * @returns Enhanced error with helpful guidance
+ */
+function enhanceAgentError(
+  error: unknown,
+  agentProviderType: AgentProviderType,
+  agentUrl: string,
+): Error {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const errorStack = error instanceof Error ? error.stack : undefined;
+
+  const commonPatterns = [
+    {
+      pattern: /unexpected token|JSON/i,
+      message:
+        "Failed to parse agent response. Your endpoint must return Server-Sent Events (SSE) with valid AG-UI protocol JSON.",
+      hint: 'Each SSE event must be formatted as: data: {"type":"...","messageId":"..."}\\n\\n',
+    },
+    {
+      pattern: /stream|fetch|network|ECONNREFUSED|ETIMEDOUT/i,
+      message: "Failed to connect to agent endpoint or stream was interrupted.",
+      hint: "Verify your Agent URL is correct and the endpoint is reachable. Ensure it returns Content-Type: text/event-stream.",
+    },
+    {
+      pattern: /messageId|role|type/i,
+      message: "Agent response is missing required fields for AG-UI protocol.",
+      hint: "All events must include required fields: type, messageId (for message events), role (for message start events).",
+    },
+    {
+      pattern: /401|403|unauthorized|forbidden/i,
+      message: "Authentication failed when calling agent endpoint.",
+      hint: "Check your Agent URL headers configuration. The Authorization header may be incorrect or missing.",
+    },
+  ];
+
+  for (const { pattern, message, hint } of commonPatterns) {
+    if (pattern.test(errorMessage) || pattern.test(errorStack ?? "")) {
+      const enhancedMessage = [
+        `${agentProviderType.toUpperCase()} Agent Error: ${message}`,
+        ``,
+        `Agent URL: ${agentUrl}`,
+        ``,
+        `💡 ${hint}`,
+        ``,
+        `📚 See documentation for configuring custom agent providers:`,
+        `   https://docs.tambo.co/concepts/agent-configuration`,
+        ``,
+        `Original error: ${errorMessage}`,
+      ].join("\n");
+
+      return new AgentProtocolError(
+        enhancedMessage,
+        agentProviderType,
+        agentUrl,
+        error,
+      );
+    }
+  }
+
+  const enhancedMessage = [
+    `${agentProviderType.toUpperCase()} Agent Error: Failed to execute agent request`,
+    ``,
+    `Agent URL: ${agentUrl}`,
+    ``,
+    `💡 Your endpoint must implement the AG-UI protocol. Common issues:`,
+    `   • Response is not Server-Sent Events (SSE) format`,
+    `   • Missing required event fields (type, messageId, role)`,
+    `   • OpenAI-style streaming instead of AG-UI events`,
+    `   • Non-streaming JSON response`,
+    ``,
+    `📚 See documentation for configuring custom agent providers:`,
+    `   https://docs.tambo.co/concepts/agent-configuration`,
+    ``,
+    `Original error: ${errorMessage}`,
+  ].join("\n");
+
+  return new AgentProtocolError(
+    enhancedMessage,
+    agentProviderType,
+    agentUrl,
+    error,
+  );
+}
+
 export enum AgentResponseType {
   MESSAGE = "message",
   COMPLETE = "complete",
@@ -57,10 +164,19 @@ export interface AgentResponse {
 export class AgentClient {
   private aguiAgent: AbstractAgent | undefined;
   chainId: string;
+  private agentProviderType: AgentProviderType;
+  private agentUrl: string;
 
-  private constructor(chainId: string, aguiAgent: AbstractAgent) {
+  private constructor(
+    chainId: string,
+    aguiAgent: AbstractAgent,
+    agentProviderType: AgentProviderType,
+    agentUrl: string,
+  ) {
     this.chainId = chainId;
     this.aguiAgent = aguiAgent;
+    this.agentProviderType = agentProviderType;
+    this.agentUrl = agentUrl;
   }
   public static async create({
     agentProviderType,
@@ -90,7 +206,12 @@ export class AgentClient {
           throw new Error(`Agent ${normalizedAgentName} not found`);
         }
         const agent = agents[normalizedAgentName];
-        const agentClient = new AgentClient(chainId, agent);
+        const agentClient = new AgentClient(
+          chainId,
+          agent,
+          agentProviderType,
+          agentUrl,
+        );
 
         return agentClient;
       }
@@ -99,21 +220,31 @@ export class AgentClient {
           url: agentUrl,
           headers,
         });
-        return new AgentClient(chainId, agent as unknown as AbstractAgent);
+        return new AgentClient(
+          chainId,
+          agent as unknown as AbstractAgent,
+          agentProviderType,
+          agentUrl,
+        );
       }
       case AgentProviderType.LLAMAINDEX: {
         const agent = new LlamaIndexAgent({
           url: agentUrl,
           headers,
         });
-        return new AgentClient(chainId, agent as unknown as AbstractAgent);
+        return new AgentClient(
+          chainId,
+          agent as unknown as AbstractAgent,
+          agentProviderType,
+          agentUrl,
+        );
       }
       case AgentProviderType.PYDANTICAI: {
         const agent = new HttpAgent({
           url: agentUrl,
           headers,
         });
-        return new AgentClient(chainId, agent);
+        return new AgentClient(chainId, agent, agentProviderType, agentUrl);
       }
       default: {
         throw new Error(
@@ -177,16 +308,29 @@ export class AgentClient {
         parameters: t.function.parameters,
       };
     });
-    const generator = runStreamingAgent(this.aguiAgent, queue, [
-      { tools: agentTools },
-    ]);
+
+    let generator: AsyncIterableIterator<EventHandlerParams, RunAgentResult>;
+    try {
+      generator = runStreamingAgent(this.aguiAgent, queue, [
+        { tools: agentTools },
+      ]);
+    } catch (error) {
+      throw enhanceAgentError(error, this.agentProviderType, this.agentUrl);
+    }
+
     let currentToolCalls: OpenAI.Chat.Completions.ChatCompletionMessageFunctionToolCall[] =
       [];
     let currentMessage: AgentMessage | undefined = undefined;
+
     for (;;) {
-      // we are doing manual iteration of the generator so we can track the "done" state at the end
-      // TODO: figure out if there's a better way to do this
-      const { done, value } = await generator.next();
+      let iteratorResult;
+      try {
+        iteratorResult = await generator.next();
+      } catch (error) {
+        throw enhanceAgentError(error, this.agentProviderType, this.agentUrl);
+      }
+
+      const { done, value } = iteratorResult;
       if (done) {
         const _agentRunResult = value;
         // result is the final result of the agent run, but we might have actually streamed everything already?
@@ -202,8 +346,9 @@ export class AgentClient {
         return;
       }
       const { event } = value;
+      const eventType = event.type as EventType;
       // here we need to yield the growing event to the caller
-      switch (event.type) {
+      switch (eventType) {
         case EventType.MESSAGES_SNAPSHOT: {
           // HACK: emit the last message from the snapshot. really we want the
           // consumer to replace all the messages they've receieved with all of
@@ -522,7 +667,7 @@ export class AgentClient {
           break;
         }
         default: {
-          invalidEvent(event.type);
+          invalidEvent(eventType);
         }
       }
     }
@@ -536,8 +681,8 @@ export class AgentClient {
   }
 }
 
-function invalidEvent(eventType: never) {
-  console.error(`Invalid event type: ${eventType}`);
+function invalidEvent(eventType: never): never {
+  throw new Error(`Invalid event type: ${eventType}`);
 }
 
 function getLastMessage(messages: AGUIMessage[]): NonActivityMessage | null {

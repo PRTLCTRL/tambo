@@ -294,7 +294,12 @@ jobs:
     name: "Sync Labels"
     needs: [meta, repo-labels]
     runs-on: ubuntu-latest
-    if: (github.event_name == 'pull_request_target' || github.event_name == 'issues') && (github.event.action != 'labeled' && github.event.action != 'unlabeled')
+    if: |
+      always() &&
+      !cancelled() &&
+      (needs.repo-labels.result == 'success' || needs.repo-labels.result == 'skipped') &&
+      (github.event_name == 'pull_request_target' || github.event_name == 'issues') &&
+      (github.event.action != 'labeled' && github.event.action != 'unlabeled')
     permissions:
       contents: read
       issues: write
@@ -417,9 +422,14 @@ jobs:
           fi
 
           if [[ ${#CMD_ARGS[@]} -gt 0 ]]; then
+            set +e
             RESULT=$(gh "${GH_SUBCOMMAND}" edit "${PR_OR_ISSUE_NUMBER}" -R "${GH_REPO}" "${CMD_ARGS[@]}" 2>&1)
-            if [[ $? -ne 0 ]]; then
-              echo "::error title=Failed to sync labels::Failed to sync labels. Error: ${RESULT}"
+            EXIT_CODE=$?
+            set -e
+            
+            if [[ ${EXIT_CODE} -ne 0 ]]; then
+              echo "::warning title=Failed to sync labels::Failed to sync labels. This may be because labels don't exist in the repository yet. Run this workflow on the main branch to create them. Error: ${RESULT}"
+              exit 0
             fi
           else
             echo "No label changes to apply"

@@ -194,6 +194,8 @@ describe("AgentClient", () => {
       const client: AgentClient = new (AgentClient as any)(
         "test-chain",
         undefined,
+        AgentProviderType.CREWAI,
+        "http://test-url",
       );
       const queue = new AsyncQueue<EventHandlerParams>();
       await expect(
@@ -1644,6 +1646,8 @@ describe("AgentClient", () => {
       const client: AgentClient = new (AgentClient as any)(
         "test-chain",
         undefined,
+        AgentProviderType.CREWAI,
+        "http://test-url",
       );
 
       await expect(
