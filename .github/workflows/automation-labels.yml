@@ -417,9 +417,11 @@ jobs:
           fi
 
           if [[ ${#CMD_ARGS[@]} -gt 0 ]]; then
-            RESULT=$(gh "${GH_SUBCOMMAND}" edit "${PR_OR_ISSUE_NUMBER}" -R "${GH_REPO}" "${CMD_ARGS[@]}" 2>&1)
-            if [[ $? -ne 0 ]]; then
-              echo "::error title=Failed to sync labels::Failed to sync labels. Error: ${RESULT}"
+            RESULT=$(gh "${GH_SUBCOMMAND}" edit "${PR_OR_ISSUE_NUMBER}" -R "${GH_REPO}" "${CMD_ARGS[@]}" 2>&1) || true
+            EXIT_CODE=$?
+            if [[ $EXIT_CODE -ne 0 ]]; then
+              echo "::warning title=Failed to sync labels::Failed to sync labels. This may be due to missing labels in the repository. Error: ${RESULT}"
+              echo "Note: Labels can be created by pushing changes to .github/labels.yml to the main branch."
             fi
           else
             echo "No label changes to apply"
