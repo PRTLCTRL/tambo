@@ -93,8 +93,8 @@ export const ComponentRenderer: FC<ComponentRendererProps> = ({
       return;
     }
 
-    // Don't add if component is still streaming (wait until finalized)
-    if (content.streamingState !== "finalized") {
+    // Don't add if component is still streaming (wait until done)
+    if (content.streamingState !== "done") {
       return;
     }
 
@@ -108,7 +108,7 @@ export const ComponentRenderer: FC<ComponentRendererProps> = ({
         name: content.name,
         description: registeredComponent.description,
         component: registeredComponent.component,
-        props: content.props ?? {},
+        props: (content.props as Record<string, unknown>) ?? {},
         propsSchema: registeredComponent.props,
         id: content.id,
       });

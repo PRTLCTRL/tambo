@@ -84,7 +84,7 @@ describe("Auto-add components to interactables", () => {
       id: "test-component-id-123",
       name: "TestCard",
       props: { title: "Auto-added Card" },
-      streamingState: "finalized",
+      streamingState: "done",
     };
 
     const TestHarness = () => {
@@ -137,7 +137,7 @@ describe("Auto-add components to interactables", () => {
       id: "test-component-id-456",
       name: "TestCard",
       props: { title: "Not Auto-added" },
-      streamingState: "finalized",
+      streamingState: "done",
     };
 
     const TestHarness = () => {
@@ -178,7 +178,7 @@ describe("Auto-add components to interactables", () => {
       id: "test-component-id-789",
       name: "TestCard",
       props: { title: "Default Behavior" },
-      streamingState: "finalized",
+      streamingState: "done",
     };
 
     const TestHarness = () => {
@@ -250,9 +250,9 @@ describe("Auto-add components to interactables", () => {
     const config: TamboConfig = { autoAddToInteractables: true };
 
     const TestHarness = () => {
-      const [streamingState, setStreamingState] = React.useState<
-        "streaming" | "finalized"
-      >("streaming");
+    const [streamingState, setStreamingState] = React.useState<
+      "streaming" | "done"
+    >("streaming");
       const { interactableComponents } = useTamboInteractable();
 
       const componentContent: TamboComponentContent = {
@@ -272,7 +272,7 @@ describe("Auto-add components to interactables", () => {
           />
           <button
             data-testid="finalize-btn"
-            onClick={() => setStreamingState("finalized")}
+            onClick={() => setStreamingState("done")}
           >
             Finalize
           </button>
@@ -314,7 +314,7 @@ describe("Auto-add components to interactables", () => {
         id: "test-component-id-duplicate",
         name: "TestCard",
         props: { title: "Same ID" },
-        streamingState: "finalized",
+        streamingState: "done",
       };
 
       return (
@@ -365,7 +365,7 @@ describe("Auto-add components to interactables", () => {
       id: "test-component-with-tools",
       name: "TestCard",
       props: { title: "With Tools" },
-      streamingState: "finalized",
+      streamingState: "done",
     };
 
     render(
