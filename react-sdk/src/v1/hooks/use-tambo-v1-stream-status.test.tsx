@@ -507,9 +507,7 @@ describe("useTamboStreamStatus", () => {
       const threadState = createThreadState([message]);
       mockUseStreamState.mockReturnValue(createStreamState(threadState));
 
-      const { result } = renderHook(() =>
-        useTamboStreamStatus<NestedProps>(),
-      );
+      const { result } = renderHook(() => useTamboStreamStatus<NestedProps>());
 
       const userStatus = result.current.propStatus.user as any;
 
@@ -547,9 +545,7 @@ describe("useTamboStreamStatus", () => {
       const threadState = createThreadState([message]);
       mockUseStreamState.mockReturnValue(createStreamState(threadState));
 
-      const { result } = renderHook(() =>
-        useTamboStreamStatus<NestedProps>(),
-      );
+      const { result } = renderHook(() => useTamboStreamStatus<NestedProps>());
 
       const userStatus = result.current.propStatus.user as any;
 
@@ -586,7 +582,7 @@ describe("useTamboStreamStatus", () => {
       );
 
       const level1Status = result.current.propStatus.level1 as any;
-      const level2Status = level1Status.level2 as any;
+      const level2Status = level1Status.level2;
       const level3Status = level2Status.level3;
 
       expect(level3Status.isPending).toBe(false);
@@ -670,7 +666,7 @@ describe("useTamboStreamStatus", () => {
 
     it("should track array of objects", () => {
       interface ArrayObjectProps {
-        users: Array<{ name: string; age: number }>;
+        users: { name: string; age: number }[];
       }
 
       const componentContent = createComponentContent({
@@ -705,7 +701,7 @@ describe("useTamboStreamStatus", () => {
       interface ComplexProps {
         user: {
           name: string;
-          posts: Array<{ title: string; likes: number }>;
+          posts: { title: string; likes: number }[];
         };
         tags: string[];
       }
@@ -727,9 +723,7 @@ describe("useTamboStreamStatus", () => {
       const threadState = createThreadState([message]);
       mockUseStreamState.mockReturnValue(createStreamState(threadState));
 
-      const { result } = renderHook(() =>
-        useTamboStreamStatus<ComplexProps>(),
-      );
+      const { result } = renderHook(() => useTamboStreamStatus<ComplexProps>());
 
       const userStatus = result.current.propStatus.user as any;
       const tagsStatus = result.current.propStatus.tags;
