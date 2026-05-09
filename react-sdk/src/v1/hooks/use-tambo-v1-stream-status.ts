@@ -139,7 +139,8 @@ function buildPropStatus(
 
   // Handle nested objects: recursively build status for each property
   if (value && typeof value === "object" && !Array.isArray(value)) {
-    const nestedStatus = basePropStatus as PropStatus & Record<string, PropStatus>;
+    const nestedStatus = basePropStatus as PropStatus &
+      Record<string, PropStatus>;
     for (const [key, nestedValue] of Object.entries(value)) {
       const nestedPath = `${path}.${key}`;
       nestedStatus[key] = buildPropStatus(
