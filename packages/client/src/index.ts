@@ -17,6 +17,7 @@ export type {
   ClientState,
   BeforeRunContext,
   ContextHelperFn,
+  OnMcpConnectionChange,
 } from "./tambo-client";
 export { TamboStream } from "./tambo-stream";
 export type { StreamEvent, TamboStreamOptions } from "./tambo-stream";
@@ -132,6 +133,8 @@ export type {
   MCPElicitationHandler,
   MCPSamplingHandler,
   MCPHandlers,
+  MCPConnectionStatus,
+  MCPClientInfo,
   ElicitationRequestedSchema,
   TamboElicitationRequest,
   TamboElicitationResponse,

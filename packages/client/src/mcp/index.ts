@@ -5,6 +5,8 @@ export {
   type MCPElicitationHandler,
   type MCPSamplingHandler,
   type MCPHandlers,
+  type MCPConnectionStatus,
+  type MCPClientInfo,
 } from "./mcp-client";
 export { MCPTransport } from "./mcp-client";
 export { ServerType, REGISTRY_SERVER_KEY } from "./mcp-constants";

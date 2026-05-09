@@ -1,6 +1,8 @@
 import { TamboClient } from "./tambo-client";
 import type { TamboTool } from "./model/component-metadata";
 import { PLACEHOLDER_THREAD_ID } from "./utils/event-accumulator";
+import { MCPTransport } from "./model/mcp-server-info";
+import * as mcpClientModule from "./mcp/mcp-client";
 
 // Stable mock functions that survive jest resetMocks.
 // We use a closure-based pattern: the jest.mock factory returns functions
@@ -71,7 +73,12 @@ jest.mock("@tambo-ai/typescript-sdk", () => {
 
 jest.mock("./mcp/mcp-client", () => ({
   MCPClient: {
-    create: async () => await Promise.resolve({ close: jest.fn() }),
+    create: async () =>
+      await Promise.resolve({
+        close: jest.fn(),
+        getEndpoint: () => "http://localhost:8080",
+        connectionStatus: "connected",
+      }),
   },
 }));
 
@@ -769,6 +776,132 @@ describe("TamboClient", () => {
         contextKey: "context-key",
         threadId: "thread-1",
       });
+    });
+
+    it("tracks connection status for successful MCP connections", async () => {
+      const client = new TamboClient({ apiKey: "test-key" });
+
+      await client.connectMcpServer({
+        name: "test-server",
+        url: "http://localhost:8080",
+        transport: MCPTransport.HTTP,
+      });
+
+      const mcpClients = client.getMcpClients();
+      const serverKey = Object.keys(mcpClients)[0];
+      expect(mcpClients[serverKey]).toMatchObject({
+        status: "connected",
+        url: "http://localhost:8080",
+      });
+      expect(mcpClients[serverKey].client).toBeDefined();
+      expect(mcpClients[serverKey].error).toBeUndefined();
+    });
+
+    it("invokes onMcpConnectionChange callback on successful connection", async () => {
+      const callback = jest.fn();
+      const client = new TamboClient({
+        apiKey: "test-key",
+        onMcpConnectionChange: callback,
+      });
+
+      await client.connectMcpServer({
+        name: "test-server",
+        url: "http://localhost:8080",
+        transport: MCPTransport.HTTP,
+      });
+
+      expect(callback).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          status: "connected",
+          url: "http://localhost:8080",
+          client: expect.any(Object),
+        }),
+      );
+    });
+
+    it("invokes onMcpConnectionChange callback on connection failure", async () => {
+      const callback = jest.fn();
+      const client = new TamboClient({
+        apiKey: "test-key",
+        onMcpConnectionChange: callback,
+      });
+
+      const createSpy = jest.spyOn(mcpClientModule.MCPClient, "create");
+      createSpy.mockRejectedValueOnce(new Error("Connection failed"));
+
+      await expect(
+        client.connectMcpServer({
+          name: "failing-server",
+          url: "http://localhost:9999",
+          transport: MCPTransport.HTTP,
+        }),
+      ).rejects.toThrow("Connection failed");
+
+      expect(callback).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          status: "failed",
+          error: "Connection failed",
+          url: "http://localhost:9999",
+        }),
+      );
+
+      createSpy.mockRestore();
+    });
+
+    it("retries failed connections when called again", async () => {
+      const callback = jest.fn();
+      const client = new TamboClient({
+        apiKey: "test-key",
+        onMcpConnectionChange: callback,
+      });
+
+      const createSpy = jest.spyOn(mcpClientModule.MCPClient, "create");
+
+      createSpy.mockRejectedValueOnce(new Error("Temporary failure"));
+
+      await expect(
+        client.connectMcpServer({
+          name: "retry-server",
+          url: "http://localhost:8080",
+          transport: MCPTransport.HTTP,
+        }),
+      ).rejects.toThrow("Temporary failure");
+
+      expect(callback).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          status: "failed",
+          error: "Temporary failure",
+        }),
+      );
+
+      callback.mockClear();
+      createSpy.mockResolvedValueOnce({
+        close: jest.fn(),
+        getEndpoint: () => "http://localhost:8080",
+      } as unknown as mcpClientModule.MCPClient);
+
+      await client.connectMcpServer({
+        name: "retry-server",
+        url: "http://localhost:8080",
+        transport: MCPTransport.HTTP,
+      });
+
+      expect(callback).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          status: "connected",
+        }),
+      );
+
+      const mcpClients = client.getMcpClients();
+      const serverKey = Object.keys(mcpClients)[0];
+      expect(mcpClients[serverKey].status).toBe("connected");
+      expect(mcpClients[serverKey].error).toBeUndefined();
+
+      createSpy.mockRestore();
     });
   });
 

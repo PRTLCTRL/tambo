@@ -417,9 +417,13 @@ jobs:
           fi
 
           if [[ ${#CMD_ARGS[@]} -gt 0 ]]; then
+            set +e  # Temporarily disable exit on error
             RESULT=$(gh "${GH_SUBCOMMAND}" edit "${PR_OR_ISSUE_NUMBER}" -R "${GH_REPO}" "${CMD_ARGS[@]}" 2>&1)
-            if [[ $? -ne 0 ]]; then
-              echo "::error title=Failed to sync labels::Failed to sync labels. Error: ${RESULT}"
+            EXIT_CODE=$?
+            set -e  # Re-enable exit on error
+            if [[ $EXIT_CODE -ne 0 ]]; then
+              echo "::warning title=Failed to sync labels::Failed to sync labels. This may be expected if labels haven't been synced yet. Error: ${RESULT}"
+              echo "Labels will be synced when .github/labels.yml is merged to main."
             fi
           else
             echo "No label changes to apply"
