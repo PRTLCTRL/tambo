@@ -125,6 +125,28 @@ Tambo can now see and modify this component when users send messages like:
 - "Change the note title to 'Important Reminder'"
 - "Update the note content to 'Don't forget the meeting at 3pm'"
 
+## Automatic Interactables
+
+If you want *all* generated components to be automatically interactable without manually wrapping them, enable the `autoAddToInteractables` prop on `TamboProvider`:
+
+```tsx
+<TamboProvider
+  apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
+  components={[WeatherCard, StockChart]}
+  autoAddToInteractables={true}
+>
+  <ChatInterface />
+</TamboProvider>
+```
+
+When enabled, any component that Tambo generates will be automatically registered as an interactable component, allowing Tambo to modify it in subsequent interactions. This is useful for:
+
+- Dashboards where all displayed components should be editable
+- Rapid prototyping scenarios
+- When you want maximum flexibility without manual setup
+
+The default value is `false`.
+
 ## Complete Example
 
 Here's a complete working example:
