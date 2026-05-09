@@ -86,7 +86,7 @@ export const ComponentRenderer: FC<ComponentRendererProps> = ({
     if (
       autoInteractables &&
       !processedIds.current.has(content.id) &&
-      content.streamingState === "complete"
+      content.streamingState === "done"
     ) {
       try {
         const registeredComponent = getComponentFromRegistry(
@@ -98,7 +98,7 @@ export const ComponentRenderer: FC<ComponentRendererProps> = ({
           name: content.name,
           description: registeredComponent.description ?? "",
           component: registeredComponent.component,
-          props: content.props ?? {},
+          props: content.props ?? ({} as Record<string, unknown>),
           propsSchema: registeredComponent.props,
         });
         processedIds.current.add(content.id);

@@ -64,7 +64,14 @@ describe("Auto Interactables", () => {
       name: "TestCard",
       description: "A test card component",
       component: TestCard,
-      props: testCardSchema,
+      propsSchema: testCardSchema,
+      props: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          description: { type: "string" },
+        },
+      },
       contextTools: [],
     },
   });
@@ -77,7 +84,7 @@ describe("Auto Interactables", () => {
       title: "Test Title",
       description: "Test description",
     },
-    streamingState: "complete",
+    streamingState: "done",
   };
 
   it("should automatically add component to interactables when autoInteractables is enabled", async () => {
@@ -180,7 +187,7 @@ describe("Auto Interactables", () => {
         title: "Card 1",
         description: "First card",
       },
-      streamingState: "complete",
+      streamingState: "done",
     };
 
     const content2: TamboComponentContent = {
@@ -191,7 +198,7 @@ describe("Auto Interactables", () => {
         title: "Card 2",
         description: "Second card",
       },
-      streamingState: "complete",
+      streamingState: "done",
     };
 
     render(
@@ -228,7 +235,7 @@ describe("Auto Interactables", () => {
       id: "unknown_123",
       name: "UnknownComponent",
       props: {},
-      streamingState: "complete",
+      streamingState: "done",
     };
 
     render(
