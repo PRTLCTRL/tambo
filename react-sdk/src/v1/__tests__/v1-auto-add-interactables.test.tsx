@@ -6,7 +6,10 @@ import { TamboRegistryContext } from "../../providers/tambo-registry-provider";
 import type { TamboRegistryContext as TamboRegistryContextType } from "../../providers/tambo-registry-provider";
 import { TamboContextHelpersProvider } from "../../providers/tambo-context-helpers-provider";
 import { TamboInteractableProvider } from "../../providers/tambo-interactable-provider";
-import { TamboProvider, TamboConfigContext } from "../providers/tambo-v1-provider";
+import {
+  TamboProvider,
+  TamboConfigContext,
+} from "../providers/tambo-v1-provider";
 import type { TamboConfig } from "../providers/tambo-v1-provider";
 import { ComponentRenderer } from "../components/v1-component-renderer";
 import type { TamboComponentContent } from "../types/message";
@@ -163,7 +166,9 @@ describe("Auto-add components to interactables", () => {
     );
 
     // Check that component is rendered
-    expect(screen.getByTestId("card-title")).toHaveTextContent("Not Auto-added");
+    expect(screen.getByTestId("card-title")).toHaveTextContent(
+      "Not Auto-added",
+    );
 
     // Check that component was NOT added to interactables
     expect(screen.getByTestId("interactable-count")).toHaveTextContent("0");
@@ -250,9 +255,9 @@ describe("Auto-add components to interactables", () => {
     const config: TamboConfig = { autoAddToInteractables: true };
 
     const TestHarness = () => {
-    const [streamingState, setStreamingState] = React.useState<
-      "streaming" | "done"
-    >("streaming");
+      const [streamingState, setStreamingState] = React.useState<
+        "streaming" | "done"
+      >("streaming");
       const { interactableComponents } = useTamboInteractable();
 
       const componentContent: TamboComponentContent = {

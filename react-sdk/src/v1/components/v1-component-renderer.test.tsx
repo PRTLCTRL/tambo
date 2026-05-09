@@ -5,19 +5,29 @@ import { ComponentRenderer } from "./v1-component-renderer";
 import { TamboRegistryContext } from "../../providers/tambo-registry-provider";
 import type { TamboRegistryContext as TamboRegistryContextType } from "../../providers/tambo-registry-provider";
 import type { TamboComponentContent } from "../types/message";
+import { TamboInteractableProvider } from "../../providers/tambo-interactable-provider";
+import { TamboContextHelpersProvider } from "../../providers/tambo-context-helpers-provider";
+import { TamboConfigContext } from "../providers/tambo-v1-provider";
+import type { TamboConfig } from "../providers/tambo-v1-provider";
 
-jest.mock("../providers/tambo-v1-provider", () => ({
-  useTamboConfig: jest.fn(() => ({
-    autoAddToInteractables: false,
-  })),
-}));
-
-jest.mock("../../providers/tambo-interactable-provider", () => ({
-  useTamboInteractable: jest.fn(() => ({
-    addInteractableComponent: jest.fn(),
-    getInteractableComponent: jest.fn(),
-  })),
-}));
+// Test wrapper with providers
+function TestWrapper({
+  children,
+  config = {},
+}: {
+  children: React.ReactNode;
+  config?: TamboConfig;
+}) {
+  return (
+    <TamboContextHelpersProvider>
+      <TamboInteractableProvider>
+        <TamboConfigContext.Provider value={config}>
+          {children}
+        </TamboConfigContext.Provider>
+      </TamboInteractableProvider>
+    </TamboContextHelpersProvider>
+  );
+}
 
 // Simple test component
 const TestComponent: React.FC<{ title: string; count?: number }> = ({
@@ -103,11 +113,13 @@ describe("ComponentRenderer", () => {
 
     render(
       <TamboRegistryContext.Provider value={registry}>
-        <ComponentRenderer
-          content={baseContent}
-          threadId="thread_123"
-          messageId="msg_456"
-        />
+        <TestWrapper>
+          <ComponentRenderer
+            content={baseContent}
+            threadId="thread_123"
+            messageId="msg_456"
+          />
+        </TestWrapper>
       </TamboRegistryContext.Provider>,
     );
 
@@ -121,12 +133,14 @@ describe("ComponentRenderer", () => {
     withMockedConsoleError((consoleErrorSpy) => {
       render(
         <TamboRegistryContext.Provider value={registry}>
-          <ComponentRenderer
-            content={baseContent}
-            threadId="thread_123"
-            messageId="msg_456"
-            fallback={<div data-testid="fallback">Not found</div>}
-          />
+          <TestWrapper>
+            <ComponentRenderer
+              content={baseContent}
+              threadId="thread_123"
+              messageId="msg_456"
+              fallback={<div data-testid="fallback">Not found</div>}
+            />
+          </TestWrapper>
         </TamboRegistryContext.Provider>,
       );
 
@@ -149,11 +163,13 @@ describe("ComponentRenderer", () => {
     withMockedConsoleError((consoleErrorSpy) => {
       const { container } = render(
         <TamboRegistryContext.Provider value={registry}>
-          <ComponentRenderer
-            content={baseContent}
-            threadId="thread_123"
-            messageId="msg_456"
-          />
+          <TestWrapper>
+            <ComponentRenderer
+              content={baseContent}
+              threadId="thread_123"
+              messageId="msg_456"
+            />
+          </TestWrapper>
         </TamboRegistryContext.Provider>,
       );
 
@@ -190,11 +206,13 @@ describe("ComponentRenderer", () => {
 
     render(
       <TamboRegistryContext.Provider value={registry}>
-        <ComponentRenderer
-          content={content}
-          threadId="thread_123"
-          messageId="msg_456"
-        />
+        <TestWrapper>
+          <ComponentRenderer
+            content={content}
+            threadId="thread_123"
+            messageId="msg_456"
+          />
+        </TestWrapper>
       </TamboRegistryContext.Provider>,
     );
 
@@ -223,11 +241,13 @@ describe("ComponentRenderer", () => {
 
     render(
       <TamboRegistryContext.Provider value={registry}>
-        <ComponentRenderer
-          content={content}
-          threadId="thread_123"
-          messageId="msg_456"
-        />
+        <TestWrapper>
+          <ComponentRenderer
+            content={content}
+            threadId="thread_123"
+            messageId="msg_456"
+          />
+        </TestWrapper>
       </TamboRegistryContext.Provider>,
     );
 
@@ -257,11 +277,13 @@ describe("ComponentRenderer", () => {
 
     render(
       <TamboRegistryContext.Provider value={registry}>
-        <ComponentRenderer
-          content={content}
-          threadId="thread_123"
-          messageId="msg_456"
-        />
+        <TestWrapper>
+          <ComponentRenderer
+            content={content}
+            threadId="thread_123"
+            messageId="msg_456"
+          />
+        </TestWrapper>
       </TamboRegistryContext.Provider>,
     );
 
@@ -293,11 +315,13 @@ describe("ComponentRenderer", () => {
 
     render(
       <TamboRegistryContext.Provider value={registry}>
-        <ComponentRenderer
-          content={content}
-          threadId="thread_123"
-          messageId="msg_456"
-        />
+        <TestWrapper>
+          <ComponentRenderer
+            content={content}
+            threadId="thread_123"
+            messageId="msg_456"
+          />
+        </TestWrapper>
       </TamboRegistryContext.Provider>,
     );
 
@@ -339,11 +363,13 @@ describe("ComponentRenderer", () => {
 
     render(
       <TamboRegistryContext.Provider value={registry}>
-        <ComponentRenderer
-          content={baseContent}
-          threadId="thread_123"
-          messageId="msg_456"
-        />
+        <TestWrapper>
+          <ComponentRenderer
+            content={baseContent}
+            threadId="thread_123"
+            messageId="msg_456"
+          />
+        </TestWrapper>
       </TamboRegistryContext.Provider>,
     );
 
@@ -376,11 +402,13 @@ describe("ComponentRenderer", () => {
 
     render(
       <TamboRegistryContext.Provider value={registry}>
-        <ComponentRenderer
-          content={content}
-          threadId="thread_123"
-          messageId="msg_456"
-        />
+        <TestWrapper>
+          <ComponentRenderer
+            content={content}
+            threadId="thread_123"
+            messageId="msg_456"
+          />
+        </TestWrapper>
       </TamboRegistryContext.Provider>,
     );
 
@@ -415,11 +443,13 @@ describe("ComponentRenderer", () => {
 
     render(
       <TamboRegistryContext.Provider value={registry}>
-        <ComponentRenderer
-          content={content}
-          threadId="thread_abc"
-          messageId="msg_def"
-        />
+        <TestWrapper>
+          <ComponentRenderer
+            content={content}
+            threadId="thread_abc"
+            messageId="msg_def"
+          />
+        </TestWrapper>
       </TamboRegistryContext.Provider>,
     );
 

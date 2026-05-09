@@ -39,7 +39,7 @@ Place these wherever you normally would within the application to enable a tradi
 
 ## Automatic Interactables
 
-For scenarios where you want *all* generated components to be interactable without manually wrapping each one, you can enable automatic interactables on the `TamboProvider`:
+For scenarios where you want _all_ generated components to be interactable without manually wrapping each one, you can enable automatic interactables on the `TamboProvider`:
 
 ```tsx
 <TamboProvider
@@ -54,6 +54,7 @@ For scenarios where you want *all* generated components to be interactable witho
 When `autoAddToInteractables` is enabled, any component that Tambo generates in response to user messages will be automatically registered as an interactable component. This means Tambo can modify it in subsequent interactions without any additional setup.
 
 This is particularly useful for:
+
 - Dashboards where all displayed components should be editable
 - Rapid prototyping where you want maximum flexibility
 - Scenarios where the set of components isn't known ahead of time
