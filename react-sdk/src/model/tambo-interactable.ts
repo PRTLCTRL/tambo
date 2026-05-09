@@ -19,9 +19,15 @@ export interface TamboInteractableComponent<
 export interface TamboInteractableContext {
   /** List of all interactable components */
   interactableComponents: TamboInteractableComponent[];
-  /** Add a new interactable component */
+  /**
+   * Add a new interactable component.
+   * @param component - Component to add (without id). If id is provided, it will be used instead of generating a random one.
+   * @returns The component ID
+   */
   addInteractableComponent: (
-    component: Omit<TamboInteractableComponent, "id" | "createdAt">,
+    component: Omit<TamboInteractableComponent, "id" | "createdAt"> & {
+      id?: string;
+    },
   ) => string;
   /** Remove an interactable component by ID */
   removeInteractableComponent: (id: string) => void;
