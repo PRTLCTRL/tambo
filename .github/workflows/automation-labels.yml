@@ -294,7 +294,12 @@ jobs:
     name: "Sync Labels"
     needs: [meta, repo-labels]
     runs-on: ubuntu-latest
-    if: (github.event_name == 'pull_request_target' || github.event_name == 'issues') && (github.event.action != 'labeled' && github.event.action != 'unlabeled')
+    if: |
+      always() &&
+      !cancelled() &&
+      (needs.repo-labels.result == 'success' || needs.repo-labels.result == 'skipped') &&
+      (github.event_name == 'pull_request_target' || github.event_name == 'issues') &&
+      (github.event.action != 'labeled' && github.event.action != 'unlabeled')
     permissions:
       contents: read
       issues: write
