@@ -420,7 +420,7 @@ export const TamboInteractableProvider: React.FC<PropsWithChildren> = ({
 
   const addInteractableComponent = useCallback(
     (
-      component: Omit<TamboInteractableComponent, "createdAt"> & {
+      component: Omit<TamboInteractableComponent, "id" | "createdAt"> & {
         id?: string;
       },
     ): string => {

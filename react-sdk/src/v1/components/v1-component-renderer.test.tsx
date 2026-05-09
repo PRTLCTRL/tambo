@@ -6,6 +6,19 @@ import { TamboRegistryContext } from "../../providers/tambo-registry-provider";
 import type { TamboRegistryContext as TamboRegistryContextType } from "../../providers/tambo-registry-provider";
 import type { TamboComponentContent } from "../types/message";
 
+jest.mock("../providers/tambo-v1-provider", () => ({
+  useTamboConfig: jest.fn(() => ({
+    autoAddToInteractables: false,
+  })),
+}));
+
+jest.mock("../../providers/tambo-interactable-provider", () => ({
+  useTamboInteractable: jest.fn(() => ({
+    addInteractableComponent: jest.fn(),
+    getInteractableComponent: jest.fn(),
+  })),
+}));
+
 // Simple test component
 const TestComponent: React.FC<{ title: string; count?: number }> = ({
   title,
