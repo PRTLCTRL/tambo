@@ -244,9 +244,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      # Always sync labels from .github/labels.yml to ensure they exist before trying to apply them
+      # Note: dry-run mode for PRs means labels are only created on push to main
       - name: Update Labels
         uses: crazy-max/ghaction-github-labeler@548a7c3603594ec17c819e1239f281a3b801ab4d # v6.0.0
-        if: ${{ contains(fromJson(needs.meta.outputs.areas || '[]'), 'labels') }}
         with:
           dry-run: ${{ github.event_name == 'pull_request_target' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -294,7 +295,8 @@ jobs:
     name: "Sync Labels"
     needs: [meta, repo-labels]
     runs-on: ubuntu-latest
-    if: (github.event_name == 'pull_request_target' || github.event_name == 'issues') && (github.event.action != 'labeled' && github.event.action != 'unlabeled')
+    # Skip on labeled/unlabeled events and when labels.yml is being changed (labels sync on merge)
+    if: (github.event_name == 'pull_request_target' || github.event_name == 'issues') && (github.event.action != 'labeled' && github.event.action != 'unlabeled') && !contains(fromJson(needs.meta.outputs.areas || '[]'), 'labels')
     permissions:
       contents: read
       issues: write
@@ -417,9 +419,14 @@ jobs:
           fi
 
           if [[ ${#CMD_ARGS[@]} -gt 0 ]]; then
+            set +e
             RESULT=$(gh "${GH_SUBCOMMAND}" edit "${PR_OR_ISSUE_NUMBER}" -R "${GH_REPO}" "${CMD_ARGS[@]}" 2>&1)
-            if [[ $? -ne 0 ]]; then
-              echo "::error title=Failed to sync labels::Failed to sync labels. Error: ${RESULT}"
+            EXIT_CODE=$?
+            set -e
+            if [[ $EXIT_CODE -ne 0 ]]; then
+              echo "::warning title=Failed to sync labels::Failed to sync labels (labels may not exist yet). Run the workflow on main with label changes to create them. Error: ${RESULT}"
+            else
+              echo "Successfully applied labels"
             fi
           else
             echo "No label changes to apply"
