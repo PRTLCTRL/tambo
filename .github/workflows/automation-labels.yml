@@ -295,7 +295,8 @@ jobs:
     name: "Sync Labels"
     needs: [meta, repo-labels]
     runs-on: ubuntu-latest
-    if: (github.event_name == 'pull_request_target' || github.event_name == 'issues') && (github.event.action != 'labeled' && github.event.action != 'unlabeled')
+    # Skip on labeled/unlabeled events and when labels.yml is being changed (labels sync on merge)
+    if: (github.event_name == 'pull_request_target' || github.event_name == 'issues') && (github.event.action != 'labeled' && github.event.action != 'unlabeled') && !contains(fromJson(needs.meta.outputs.areas || '[]'), 'labels')
     permissions:
       contents: read
       issues: write
