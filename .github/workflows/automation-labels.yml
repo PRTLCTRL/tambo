@@ -246,7 +246,6 @@ jobs:
 
       - name: Update Labels
         uses: crazy-max/ghaction-github-labeler@548a7c3603594ec17c819e1239f281a3b801ab4d # v6.0.0
-        if: ${{ contains(fromJson(needs.meta.outputs.areas || '[]'), 'labels') }}
         with:
           dry-run: ${{ github.event_name == 'pull_request_target' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -417,9 +416,10 @@ jobs:
           fi
 
           if [[ ${#CMD_ARGS[@]} -gt 0 ]]; then
-            RESULT=$(gh "${GH_SUBCOMMAND}" edit "${PR_OR_ISSUE_NUMBER}" -R "${GH_REPO}" "${CMD_ARGS[@]}" 2>&1)
-            if [[ $? -ne 0 ]]; then
-              echo "::error title=Failed to sync labels::Failed to sync labels. Error: ${RESULT}"
+            RESULT=$(gh "${GH_SUBCOMMAND}" edit "${PR_OR_ISSUE_NUMBER}" -R "${GH_REPO}" "${CMD_ARGS[@]}" 2>&1) || true
+            EXIT_CODE=$?
+            if [[ $EXIT_CODE -ne 0 ]]; then
+              echo "::warning title=Failed to sync labels::Failed to sync labels. This is expected if labels don't exist yet. Error: ${RESULT}"
             fi
           else
             echo "No label changes to apply"
