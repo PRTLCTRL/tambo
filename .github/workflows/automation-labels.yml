@@ -246,7 +246,6 @@ jobs:
 
       - name: Update Labels
         uses: crazy-max/ghaction-github-labeler@548a7c3603594ec17c819e1239f281a3b801ab4d # v6.0.0
-        if: ${{ contains(fromJson(needs.meta.outputs.areas || '[]'), 'labels') }}
         with:
           dry-run: ${{ github.event_name == 'pull_request_target' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
