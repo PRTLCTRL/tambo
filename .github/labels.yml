@@ -1,4 +1,5 @@
 # GitHub labels configuration (see .github/workflows/automation-labels.yml)
+# This file defines all repository labels that are automatically synced to GitHub
 # Area labels - which part of the codebase
 - name: "area: api"
   color: "26b5ce"
