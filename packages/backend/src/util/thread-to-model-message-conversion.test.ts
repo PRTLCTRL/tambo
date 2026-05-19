@@ -3,6 +3,7 @@ import {
   MessageRole,
   LegacyComponentDecision,
   ThreadAssistantMessage,
+  ThreadMessage,
 } from "@tambo-ai-cloud/core";
 import { convertAssistantMessage } from "./thread-to-model-message-conversion";
 
@@ -34,6 +35,7 @@ describe("convertAssistantMessage", () => {
         message,
         [],
         testMimeTypePredicate,
+        undefined,
       );
 
       expect(result).toHaveLength(1);
@@ -64,6 +66,7 @@ describe("convertAssistantMessage", () => {
         message,
         [],
         testMimeTypePredicate,
+        undefined,
       );
 
       expect(result).toHaveLength(1);
@@ -113,6 +116,7 @@ describe("convertAssistantMessage", () => {
         message,
         [],
         testMimeTypePredicate,
+        undefined,
       );
 
       expect(result).toHaveLength(1);
@@ -140,6 +144,7 @@ describe("convertAssistantMessage", () => {
         message,
         [],
         testMimeTypePredicate,
+        undefined,
       );
 
       expect(result).toHaveLength(1);
@@ -160,6 +165,7 @@ describe("convertAssistantMessage", () => {
         message,
         [],
         testMimeTypePredicate,
+        undefined,
       );
 
       expect(result).toHaveLength(1);
@@ -180,6 +186,7 @@ describe("convertAssistantMessage", () => {
         message,
         [],
         testMimeTypePredicate,
+        undefined,
       );
 
       expect(result).toHaveLength(1);
@@ -211,6 +218,7 @@ describe("convertAssistantMessage", () => {
         message,
         [],
         testMimeTypePredicate,
+        undefined,
       );
 
       expect(result).toHaveLength(1);
@@ -247,6 +255,7 @@ describe("convertAssistantMessage", () => {
         message,
         [],
         testMimeTypePredicate,
+        undefined,
       );
 
       expect(result).toHaveLength(1);
@@ -286,6 +295,7 @@ describe("convertAssistantMessage", () => {
         message,
         [toolCallId],
         testMimeTypePredicate,
+        undefined,
       );
 
       expect(result).toEqual([
@@ -305,6 +315,150 @@ describe("convertAssistantMessage", () => {
           ],
         },
       ]);
+    });
+
+    it("should not add fake tool_result when next message is the matching tool result", () => {
+      const toolCallId = "toolu_015iyCHNaN5JRBmZ3iZDYabP";
+      const assistantMessage: ThreadAssistantMessage = {
+        ...baseAssistantMessage,
+        id: "msg_assistant",
+        content: [{ type: ContentPartType.Text, text: "Let me help you" }],
+        tool_call_id: toolCallId,
+        toolCallRequest: {
+          toolName: "show_component_note",
+          parameters: [{ parameterName: "title", parameterValue: "Note" }],
+        },
+      };
+
+      const toolResultMessage: ThreadMessage = {
+        id: "msg_tool",
+        threadId: "thread_123",
+        role: MessageRole.Tool,
+        createdAt: new Date("2024-01-01T00:00:01Z"),
+        content: [{ type: ContentPartType.Text, text: '{"success": true}' }],
+        tool_call_id: toolCallId,
+      };
+
+      const result = convertAssistantMessage(
+        assistantMessage,
+        [], // Not in respondedToolIds yet
+        testMimeTypePredicate,
+        toolResultMessage, // Next message is the tool result
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({
+        role: "assistant",
+        content: [
+          { type: "text", text: "Let me help you" },
+          {
+            type: "tool-call",
+            toolCallId,
+            toolName: "show_component_note",
+            input: { title: "Note" },
+          },
+        ],
+      });
+    });
+
+    it("should add fake tool_result when next message is NOT the matching tool result", () => {
+      const toolCallId = "toolu_015iyCHNaN5JRBmZ3iZDYabP";
+      const assistantMessage: ThreadAssistantMessage = {
+        ...baseAssistantMessage,
+        id: "msg_assistant",
+        content: [{ type: ContentPartType.Text, text: "Let me help you" }],
+        tool_call_id: toolCallId,
+        toolCallRequest: {
+          toolName: "show_component_note",
+          parameters: [{ parameterName: "title", parameterValue: "Note" }],
+        },
+      };
+
+      const userMessage: ThreadMessage = {
+        id: "msg_user",
+        threadId: "thread_123",
+        role: MessageRole.User,
+        createdAt: new Date("2024-01-01T00:00:01Z"),
+        content: [{ type: ContentPartType.Text, text: "Never mind" }],
+      };
+
+      const result = convertAssistantMessage(
+        assistantMessage,
+        [], // Not in respondedToolIds yet
+        testMimeTypePredicate,
+        userMessage, // Next message is a user message, not tool result
+      );
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({
+        role: "assistant",
+        content: [
+          { type: "text", text: "Let me help you" },
+          {
+            type: "tool-call",
+            toolCallId,
+            toolName: "show_component_note",
+            input: { title: "Note" },
+          },
+        ],
+      });
+      expect(result[1]).toEqual({
+        role: "tool",
+        content: [
+          {
+            type: "tool-result",
+            output: { type: "text", value: "{}" },
+            toolCallId,
+            toolName: "show_component_note",
+          },
+        ],
+      });
+    });
+
+    it("should add fake tool_result when there is no next message", () => {
+      const toolCallId = "toolu_015iyCHNaN5JRBmZ3iZDYabP";
+      const assistantMessage: ThreadAssistantMessage = {
+        ...baseAssistantMessage,
+        id: "msg_assistant",
+        content: [{ type: ContentPartType.Text, text: "Let me help you" }],
+        tool_call_id: toolCallId,
+        toolCallRequest: {
+          toolName: "show_component_note",
+          parameters: [{ parameterName: "title", parameterValue: "Note" }],
+        },
+      };
+
+      const result = convertAssistantMessage(
+        assistantMessage,
+        [], // Not in respondedToolIds yet
+        testMimeTypePredicate,
+        undefined, // No next message
+      );
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({
+        role: "assistant",
+        content: [
+          { type: "text", text: "Let me help you" },
+          {
+            type: "tool-call",
+            toolCallId,
+            toolName: "show_component_note",
+            input: { title: "Note" },
+          },
+        ],
+      });
+      expect(result[1]).toEqual({
+        role: "tool",
+        content: [
+          {
+            type: "tool-result",
+            output: { type: "text", value: "{}" },
+            toolCallId,
+            toolName: "show_component_note",
+          },
+        ],
+      });
     });
   });
 });

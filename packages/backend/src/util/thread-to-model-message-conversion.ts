@@ -103,6 +103,7 @@ export function threadMessagesToModelMessages(
 
   for (let i = 0; i < messages.length; i++) {
     const message = messages[i];
+    const nextMessage = i + 1 < messages.length ? messages[i + 1] : undefined;
 
     switch (message.role) {
       case MessageRole.Tool: {
@@ -117,6 +118,7 @@ export function threadMessagesToModelMessages(
           message,
           respondedToolIds,
           isSupportedMimeType,
+          nextMessage,
         );
         modelMessages.push(...converted);
         break;
@@ -249,39 +251,23 @@ export function convertAssistantMessage(
   message: ThreadMessage,
   respondedToolIds: string[],
   _isSupportedMimeType: (mimeType: string) => boolean,
+  nextMessage?: ThreadMessage,
 ): ModelMessage[] {
   const toolCallRequest =
     message.toolCallRequest ?? message.component?.toolCallRequest;
+  const toolCallId = message.tool_call_id ?? "";
+  const hasToolCall = toolCallId && toolCallRequest;
 
-  // Case 1: Fake tool call for missing response (backward compatibility)
-  // Port from thread-message-conversion.ts:92-112
-  if (
-    message.tool_call_id &&
-    toolCallRequest &&
-    !respondedToolIds.includes(message.tool_call_id)
-  ) {
-    console.warn(
-      `tool message ${message.id} not responded to, responding with tool call (${message.tool_call_id})`,
-    );
+  // Determine if this tool call has been responded to:
+  // - Check if it's in the respondedToolIds list (already processed)
+  // - Check if the next message is the tool result (will be processed)
+  const isToolResponded = hasToolCall && respondedToolIds.includes(toolCallId);
+  const isNextMessageToolResult =
+    hasToolCall &&
+    nextMessage?.role === MessageRole.Tool &&
+    nextMessage.tool_call_id === toolCallId;
 
-    const toolCalls = formatFunctionCall(toolCallRequest, message.tool_call_id);
-    return [
-      {
-        role: "assistant",
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(toolCalls[0]),
-          },
-        ],
-      } satisfies AssistantModelMessage,
-    ];
-  }
-
-  // Case 2: Regular assistant message with optional tool calls
-  // Note: Components are now decided by tool calls (UI tools like show_component_*),
-  // so a message with both component and toolCallRequest means the component decision
-  // came from the tool call itself. We handle this as a normal tool call.
+  // Build the regular assistant message with optional tool calls
   const content: (ToolCallPart | { type: "text"; text: string })[] = [];
 
   // Add text content from message.content
@@ -295,8 +281,7 @@ export function convertAssistantMessage(
   });
 
   // Add tool calls if present
-  const toolCallId = message.tool_call_id ?? "";
-  if (toolCallId && toolCallRequest) {
+  if (hasToolCall) {
     const toolCalls = formatFunctionCall(toolCallRequest, toolCallId);
     toolCalls.forEach((call) => {
       if (call.type === "function") {
@@ -329,8 +314,18 @@ export function convertAssistantMessage(
     content,
   };
 
-  // If there's a tool call that hasn't been responded to, add fake response
-  if (toolCallId && toolCallRequest && !respondedToolIds.includes(toolCallId)) {
+  // CRITICAL FIX for Anthropic Opus 4.6: Check if there's a tool call that hasn't been responded to.
+  // Only add a fake tool_result if BOTH conditions are true:
+  // 1. Tool call exists and hasn't been responded to (not in respondedToolIds)
+  // 2. The next message is NOT the matching tool result
+  //
+  // This prevents Anthropic's "tool_use without tool_result" error when the tool result
+  // is coming in the next message. Anthropic requires strict sequencing: each tool_use
+  // must be immediately followed by its tool_result in the next message.
+  if (hasToolCall && !isToolResponded && !isNextMessageToolResult) {
+    console.warn(
+      `tool message ${message.id} not responded to, adding fake tool_result (${toolCallId})`,
+    );
     const toolName = toolCallRequest.toolName;
     return [
       assistantMessage,
