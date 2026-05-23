@@ -23,6 +23,9 @@ import { makeJsonSchemaPartial, schemaToJsonSchema } from "../schema";
 import { assertValidName } from "../util/validate-component-name";
 import { useTamboRegistry } from "./tambo-registry-provider";
 import { useTamboContextHelpers } from "./tambo-context-helpers-provider";
+import { useTamboConfig } from "../v1/providers/tambo-v1-provider";
+import { useStreamState } from "../v1/providers/tambo-v1-stream-context";
+import type { TamboComponentContent } from "@tambo-ai/client";
 
 const TamboInteractableContext = createContext<TamboInteractableContext>({
   interactableComponents: [],
@@ -562,10 +565,117 @@ export const TamboInteractableProvider: React.FC<PropsWithChildren> = ({
 
   return (
     <TamboInteractableContext.Provider value={value}>
+      <AutoInteractablesManager addInteractableComponent={addInteractableComponent} />
       {children}
     </TamboInteractableContext.Provider>
   );
 };
+
+/**
+ * Safely gets the TamboConfig or returns undefined if not available.
+ * @internal
+ */
+function useTamboConfigSafe() {
+  try {
+    return useTamboConfig();
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Safely gets the stream state or returns undefined if not available.
+ * @internal
+ */
+function useStreamStateSafe() {
+  try {
+    return useStreamState();
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Internal component that automatically adds AI-generated components to the interactables registry
+ * when autoInteractables is enabled.
+ * @internal
+ */
+function AutoInteractablesManager({
+  addInteractableComponent,
+}: {
+  addInteractableComponent: TamboInteractableContext["addInteractableComponent"];
+}): null {
+  const config = useTamboConfigSafe();
+  const streamState = useStreamStateSafe();
+  const { getComponent } = useTamboRegistry();
+  const processedComponentsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    // Only proceed if autoInteractables is enabled
+    if (!config?.autoInteractables || !streamState) {
+      return;
+    }
+
+    // Get current thread's messages
+    const currentThread = streamState.threadMap[streamState.currentThreadId];
+    if (!currentThread) {
+      return;
+    }
+
+    // Iterate through all messages and find component content blocks
+    for (const message of currentThread.thread.messages) {
+      if (message.role !== "assistant") {
+        continue;
+      }
+
+      for (const content of message.content) {
+        if (content.type !== "component") {
+          continue;
+        }
+
+        const componentContent = content as TamboComponentContent;
+        const componentKey = `${message.id}_${componentContent.componentId}`;
+
+        // Skip if already processed
+        if (processedComponentsRef.current.has(componentKey)) {
+          continue;
+        }
+
+        // Skip if streaming is not done
+        if (componentContent.streamingState !== "done") {
+          continue;
+        }
+
+        // Get component metadata from registry
+        const componentMetadata = getComponent(componentContent.componentName);
+        if (!componentMetadata) {
+          continue;
+        }
+
+        // Add to interactables
+        try {
+          addInteractableComponent({
+            name: componentContent.componentName,
+            description: componentMetadata.description,
+            props: componentContent.props || {},
+            propsSchema: componentMetadata.propsSchema,
+            state: {},
+          });
+
+          // Mark as processed
+          processedComponentsRef.current.add(componentKey);
+        } catch (error) {
+          console.warn(
+            `Failed to auto-add component ${componentContent.componentName} to interactables:`,
+            error,
+          );
+        }
+      }
+    }
+  }, [config?.autoInteractables, streamState, addInteractableComponent, getComponent]);
+
+  return null;
+}
 
 /**
  * The useTamboInteractable hook provides access to the interactable component
