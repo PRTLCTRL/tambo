@@ -645,6 +645,83 @@ interface PropStatus {
 | `isSuccess`   | `boolean` | This prop has finished streaming successfully      |
 | `error`       | `Error`   | Error that occurred during streaming for this prop |
 
+### ArrayPropStatus
+
+Extended streaming status for array props, includes item-level tracking.
+
+```typescript
+interface ArrayPropStatus extends PropStatus {
+  completedItems: unknown[];
+  streamingItems: unknown[];
+}
+```
+
+| Property          | Type        | Description                                      |
+| ----------------- | ----------- | ------------------------------------------------ |
+| `completedItems`  | `unknown[]` | Array items that have finished streaming         |
+| `streamingItems`  | `unknown[]` | Array items that are currently streaming         |
+
+**Example**:
+
+```tsx
+interface TodoListProps {
+  todos: Array<{ id: string; title: string }>;
+}
+
+function TodoList(props: TodoListProps) {
+  const { propStatus } = useTamboStreamStatus<TodoListProps>();
+  
+  // Show only completed todos during streaming
+  const todos = propStatus.todos?.completedItems ?? [];
+  
+  return (
+    <ul>
+      {todos.map((todo: any) => <li key={todo.id}>{todo.title}</li>)}
+    </ul>
+  );
+}
+```
+
+### NestedPropStatus
+
+Type helper for accessing streaming status of nested properties and arrays.
+
+```typescript
+type NestedPropStatus<T> = PropStatus & 
+  (T extends (infer U)[] 
+    ? ArrayPropStatus 
+    : T extends object
+      ? { [K in keyof T]?: NestedPropStatus<T[K]> }
+      : Record<string, never>);
+```
+
+**Example**:
+
+```tsx
+interface UserProfile {
+  user: {
+    name: string;
+    email: string;
+    address: {
+      city: string;
+      country: string;
+    };
+  };
+}
+
+function Profile(props: UserProfile) {
+  const { propStatus } = useTamboStreamStatus<UserProfile>();
+  
+  // Access nested property status
+  if (propStatus.user?.name?.isStreaming) {
+    return <span className="animate-pulse">Loading...</span>;
+  }
+  
+  if (propStatus.user?.address?.city?.isSuccess) {
+    return <span>{props.user.address.city}</span>;
+  }
+}
+
 ## Tool Annotations
 
 ### ToolAnnotations
