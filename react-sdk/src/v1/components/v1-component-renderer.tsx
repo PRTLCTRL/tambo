@@ -13,8 +13,10 @@
  */
 
 import { parse } from "partial-json";
-import React, { type FC, useMemo, useContext } from "react";
+import React, { type FC, useMemo, useContext, useEffect, useRef } from "react";
 import { TamboRegistryContext } from "../../providers/tambo-registry-provider";
+import { useTamboInteractable } from "../../providers/tambo-interactable-provider";
+import { useTamboConfig } from "../providers/tambo-v1-provider";
 import { isStandardSchema } from "../../schema";
 import { isPromise } from "../../util/is-promise";
 import { getComponentFromRegistry } from "../../util/registry";
@@ -76,6 +78,9 @@ export const ComponentRenderer: FC<ComponentRendererProps> = ({
   fallback = null,
 }) => {
   const registry = useContext(TamboRegistryContext);
+  const { addInteractableComponent } = useTamboInteractable();
+  const config = useTamboConfig();
+  const hasAddedToInteractables = useRef(false);
 
   // Memoize the rendered element - only recreates when props change
   const element = useMemo(() => {
@@ -136,6 +141,49 @@ export const ComponentRenderer: FC<ComponentRendererProps> = ({
     messageId,
     threadId,
     registry.componentList,
+  ]);
+
+  // Automatically add component to interactables if autoInteractable is enabled
+  useEffect(() => {
+    if (
+      config.autoInteractable &&
+      !hasAddedToInteractables.current &&
+      content.streamingState === "complete"
+    ) {
+      try {
+        const registeredComponent = getComponentFromRegistry(
+          content.name,
+          registry.componentList,
+        );
+
+        addInteractableComponent({
+          name: content.name,
+          description: registeredComponent.description,
+          component: registeredComponent.component,
+          props: content.props ?? {},
+          propsSchema: registeredComponent.props,
+        });
+
+        hasAddedToInteractables.current = true;
+      } catch (error) {
+        console.error(
+          "[ComponentRenderer] Failed to add component to interactables",
+          {
+            componentId: content.id,
+            componentName: content.name,
+            error,
+          },
+        );
+      }
+    }
+  }, [
+    config.autoInteractable,
+    content.id,
+    content.name,
+    content.props,
+    content.streamingState,
+    registry.componentList,
+    addInteractableComponent,
   ]);
 
   if (element === null) {

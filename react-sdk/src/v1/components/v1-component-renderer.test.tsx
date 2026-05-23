@@ -4,6 +4,9 @@ import { z } from "zod";
 import { ComponentRenderer } from "./v1-component-renderer";
 import { TamboRegistryContext } from "../../providers/tambo-registry-provider";
 import type { TamboRegistryContext as TamboRegistryContextType } from "../../providers/tambo-registry-provider";
+import { TamboInteractableProvider } from "../../providers/tambo-interactable-provider";
+import { TamboConfigContext } from "../providers/tambo-v1-provider";
+import type { TamboConfig } from "../providers/tambo-v1-provider";
 import type { TamboComponentContent } from "../types/message";
 
 // Simple test component
@@ -54,6 +57,15 @@ function createMockRegistry(
     registerResource: jest.fn(),
     registerResources: jest.fn(),
     registerResourceSource: jest.fn(),
+  };
+}
+
+// Create a mock config
+function createMockConfig(config: Partial<TamboConfig> = {}): TamboConfig {
+  return {
+    userKey: "test-user",
+    autoInteractable: false,
+    ...config,
   };
 }
 
@@ -400,16 +412,220 @@ describe("ComponentRenderer", () => {
       streamingState: "done",
     };
 
+    const config = createMockConfig();
+
     render(
       <TamboRegistryContext.Provider value={registry}>
-        <ComponentRenderer
-          content={content}
-          threadId="thread_abc"
-          messageId="msg_def"
-        />
+        <TamboInteractableProvider>
+          <TamboConfigContext.Provider value={config}>
+            <ComponentRenderer
+              content={content}
+              threadId="thread_abc"
+              messageId="msg_def"
+            />
+          </TamboConfigContext.Provider>
+        </TamboInteractableProvider>
       </TamboRegistryContext.Provider>,
     );
 
     expect(screen.getByTestId("context-aware")).toBeInTheDocument();
+  });
+
+  describe("autoInteractable feature", () => {
+    it("automatically adds component to interactables when autoInteractable is enabled and streaming is complete", () => {
+      const registry = createMockRegistry({
+        TestComponent: {
+          name: "TestComponent",
+          description: "A test component",
+          component: TestComponent,
+          props: { type: "object" },
+          contextTools: [],
+        },
+      });
+
+      const config = createMockConfig({ autoInteractable: true });
+
+      const content: TamboComponentContent = {
+        type: "component",
+        id: "comp_auto",
+        name: "TestComponent",
+        props: { title: "Auto Interactable" },
+        streamingState: "complete",
+      };
+
+      // Component to check if interactable was added
+      const { useTamboInteractable } = require("../../providers/tambo-interactable-provider");
+      const InteractableChecker: React.FC = () => {
+        const { interactableComponents } = useTamboInteractable();
+        return (
+          <div data-testid="interactable-count">
+            {interactableComponents.length}
+          </div>
+        );
+      };
+
+      render(
+        <TamboRegistryContext.Provider value={registry}>
+          <TamboInteractableProvider>
+            <TamboConfigContext.Provider value={config}>
+              <ComponentRenderer
+                content={content}
+                threadId="thread_123"
+                messageId="msg_456"
+              />
+              <InteractableChecker />
+            </TamboConfigContext.Provider>
+          </TamboInteractableProvider>
+        </TamboRegistryContext.Provider>,
+      );
+
+      expect(screen.getByTestId("test-component")).toBeInTheDocument();
+      expect(screen.getByTestId("interactable-count")).toHaveTextContent("1");
+    });
+
+    it("does not add component to interactables when autoInteractable is disabled", () => {
+      const registry = createMockRegistry({
+        TestComponent: {
+          name: "TestComponent",
+          description: "A test component",
+          component: TestComponent,
+          props: { type: "object" },
+          contextTools: [],
+        },
+      });
+
+      const config = createMockConfig({ autoInteractable: false });
+
+      const content: TamboComponentContent = {
+        type: "component",
+        id: "comp_no_auto",
+        name: "TestComponent",
+        props: { title: "Not Auto Interactable" },
+        streamingState: "complete",
+      };
+
+      // Component to check if interactable was added
+      const { useTamboInteractable } = require("../../providers/tambo-interactable-provider");
+      const InteractableChecker: React.FC = () => {
+        const { interactableComponents } = useTamboInteractable();
+        return (
+          <div data-testid="interactable-count">
+            {interactableComponents.length}
+          </div>
+        );
+      };
+
+      render(
+        <TamboRegistryContext.Provider value={registry}>
+          <TamboInteractableProvider>
+            <TamboConfigContext.Provider value={config}>
+              <ComponentRenderer
+                content={content}
+                threadId="thread_123"
+                messageId="msg_456"
+              />
+              <InteractableChecker />
+            </TamboConfigContext.Provider>
+          </TamboInteractableProvider>
+        </TamboRegistryContext.Provider>,
+      );
+
+      expect(screen.getByTestId("test-component")).toBeInTheDocument();
+      expect(screen.getByTestId("interactable-count")).toHaveTextContent("0");
+    });
+
+    it("does not add component to interactables when still streaming", () => {
+      const registry = createMockRegistry({
+        TestComponent: {
+          name: "TestComponent",
+          description: "A test component",
+          component: TestComponent,
+          props: { type: "object" },
+          contextTools: [],
+        },
+      });
+
+      const config = createMockConfig({ autoInteractable: true });
+
+      const content: TamboComponentContent = {
+        type: "component",
+        id: "comp_streaming",
+        name: "TestComponent",
+        props: { title: "Streaming" },
+        streamingState: "streaming",
+      };
+
+      // Component to check if interactable was added
+      const { useTamboInteractable } = require("../../providers/tambo-interactable-provider");
+      const InteractableChecker: React.FC = () => {
+        const { interactableComponents } = useTamboInteractable();
+        return (
+          <div data-testid="interactable-count">
+            {interactableComponents.length}
+          </div>
+        );
+      };
+
+      render(
+        <TamboRegistryContext.Provider value={registry}>
+          <TamboInteractableProvider>
+            <TamboConfigContext.Provider value={config}>
+              <ComponentRenderer
+                content={content}
+                threadId="thread_123"
+                messageId="msg_456"
+              />
+              <InteractableChecker />
+            </TamboConfigContext.Provider>
+          </TamboInteractableProvider>
+        </TamboRegistryContext.Provider>,
+      );
+
+      expect(screen.getByTestId("test-component")).toBeInTheDocument();
+      expect(screen.getByTestId("interactable-count")).toHaveTextContent("0");
+    });
+
+    it("handles error when component is not found in registry during auto-add", () => {
+      const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation();
+
+      // Empty registry - component won't be found
+      const registry = createMockRegistry({});
+
+      const config = createMockConfig({ autoInteractable: true });
+
+      const content: TamboComponentContent = {
+        type: "component",
+        id: "comp_error",
+        name: "NonExistentComponent",
+        props: { title: "Error Test" },
+        streamingState: "complete",
+      };
+
+      render(
+        <TamboRegistryContext.Provider value={registry}>
+          <TamboInteractableProvider>
+            <TamboConfigContext.Provider value={config}>
+              <ComponentRenderer
+                content={content}
+                threadId="thread_123"
+                messageId="msg_456"
+                fallback={<div data-testid="fallback">Not found</div>}
+              />
+            </TamboConfigContext.Provider>
+          </TamboInteractableProvider>
+        </TamboRegistryContext.Provider>,
+      );
+
+      expect(screen.getByTestId("fallback")).toBeInTheDocument();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "[ComponentRenderer] Failed to add component to interactables",
+        expect.objectContaining({
+          componentId: "comp_error",
+          componentName: "NonExistentComponent",
+        }),
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
   });
 });
