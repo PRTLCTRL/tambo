@@ -23,6 +23,7 @@ import { makeJsonSchemaPartial, schemaToJsonSchema } from "../schema";
 import { assertValidName } from "../util/validate-component-name";
 import { useTamboRegistry } from "./tambo-registry-provider";
 import { useTamboContextHelpers } from "./tambo-context-helpers-provider";
+import { TamboInteractableAutoSync } from "./tambo-interactable-auto-sync";
 
 const TamboInteractableContext = createContext<TamboInteractableContext>({
   interactableComponents: [],
@@ -562,6 +563,7 @@ export const TamboInteractableProvider: React.FC<PropsWithChildren> = ({
 
   return (
     <TamboInteractableContext.Provider value={value}>
+      <TamboInteractableAutoSync />
       {children}
     </TamboInteractableContext.Provider>
   );
