@@ -13,13 +13,15 @@
  */
 
 import { parse } from "partial-json";
-import React, { type FC, useMemo, useContext } from "react";
+import React, { type FC, useMemo, useContext, useEffect, useRef } from "react";
 import { TamboRegistryContext } from "../../providers/tambo-registry-provider";
+import { useTamboInteractable } from "../../providers/tambo-interactable-provider";
 import { isStandardSchema } from "../../schema";
 import { isPromise } from "../../util/is-promise";
 import { getComponentFromRegistry } from "../../util/registry";
 import type { TamboComponentContent } from "../types/message";
 import { ComponentContentProvider } from "../utils/component-renderer";
+import { useTamboConfig } from "../providers/tambo-v1-provider";
 
 export interface ComponentRendererProps {
   /**
@@ -76,6 +78,10 @@ export const ComponentRenderer: FC<ComponentRendererProps> = ({
   fallback = null,
 }) => {
   const registry = useContext(TamboRegistryContext);
+  const config = useTamboConfig();
+  const { addInteractableComponent, getInteractableComponent } =
+    useTamboInteractable();
+  const addedToInteractablesRef = useRef(false);
 
   // Memoize the rendered element - only recreates when props change
   const element = useMemo(() => {
@@ -135,6 +141,57 @@ export const ComponentRenderer: FC<ComponentRendererProps> = ({
     content.streamingState,
     messageId,
     threadId,
+    registry.componentList,
+  ]);
+
+  // Automatically add component to interactables if the feature is enabled
+  useEffect(() => {
+    if (
+      !config.autoAddGeneratedComponentsToInteractables ||
+      addedToInteractablesRef.current ||
+      element === null
+    ) {
+      return;
+    }
+
+    // Check if this component ID is already in interactables
+    const existingInteractable = getInteractableComponent(content.id);
+    if (existingInteractable) {
+      addedToInteractablesRef.current = true;
+      return;
+    }
+
+    try {
+      const registeredComponent = getComponentFromRegistry(
+        content.name,
+        registry.componentList,
+      );
+
+      addInteractableComponent({
+        name: content.name,
+        description:
+          registeredComponent.description ?? `${content.name} component`,
+        component: registeredComponent.component,
+        props: content.props ?? {},
+        propsSchema: registeredComponent.props,
+        id: content.id,
+      });
+
+      addedToInteractablesRef.current = true;
+    } catch (error) {
+      console.warn(
+        `[ComponentRenderer] Failed to add component ${content.name} to interactables:`,
+        error,
+      );
+    }
+  }, [
+    config.autoAddGeneratedComponentsToInteractables,
+    content.id,
+    content.name,
+    content.props,
+    element,
+    addInteractableComponent,
+    getInteractableComponent,
     registry.componentList,
   ]);
 
