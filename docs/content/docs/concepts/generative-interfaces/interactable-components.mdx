@@ -14,6 +14,10 @@ This creates a conversational interface where traditional UI manipulation and na
 
 ## How Interactables Work
 
+There are two ways to make components interactable with Tambo:
+
+### Manual Interactables (Pre-placed)
+
 Interactables are normal React components that you build and then wrap with Tambo's `withTamboInteractable` to give Tambo access to them.
 
 ```tsx
@@ -36,6 +40,31 @@ When you wrap a component with `withTamboInteractable`, Tambo creates an automat
 **Automatic Tool Registration**: Update tools are automatically registered to allow Tambo to update the component's props when needed.
 
 Place these wherever you normally would within the application to enable a traditional, statically-organized, user interface enhanced with AI capabilities.
+
+### Automatic Interactables (Generated Components)
+
+Sometimes you want Tambo to update previously-generated components rather than always creating new ones. Enable this by setting `autoAddComponentsToInteractables` on your `TamboProvider`:
+
+```tsx
+<TamboProvider
+  apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
+  components={[WeatherCard, StockChart]}
+  autoAddComponentsToInteractables={true}
+>
+  <Chat />
+</TamboProvider>
+```
+
+When enabled:
+- Any component Tambo generates in a message is automatically added to the interactables list
+- Tambo can reference and update these components in subsequent messages
+- Instead of creating a new weather card, Tambo can update the existing one
+- Components are only added once (tracked by component ID) to avoid duplicates
+
+This is particularly useful for:
+- Building interfaces where components should persist and update across multiple interactions
+- Creating dashboards where widgets should update in place
+- Displaying lists of interactables rather than thread messages
 
 <LearnMore
   title="How to register Interactable components"
