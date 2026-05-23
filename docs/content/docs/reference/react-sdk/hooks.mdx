@@ -384,9 +384,11 @@ function EditableCard({ title: initialTitle }: { title: string }) {
 
 ## useTamboStreamStatus
 
-Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity.
+Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity, including support for nested objects and arrays.
 
 **Important**: Props update repeatedly during streaming and may be partial. Use `propStatus.<field>?.isSuccess` before treating a prop as complete.
+
+### Basic Usage
 
 ```tsx
 import { useTamboStreamStatus } from "@tambo-ai/react";
@@ -402,6 +404,81 @@ function MyComponent(props: MyProps) {
         {props.title}
       </h2>
       {streamStatus.isSuccess && <p>Stream complete</p>}
+    </div>
+  );
+}
+```
+
+### Nested Object Properties
+
+Track streaming status for nested object properties:
+
+```tsx
+interface UserCardProps {
+  user: {
+    name: string;
+    email: string;
+    profile: {
+      bio: string;
+    };
+  };
+}
+
+function UserCard(props: UserCardProps) {
+  const { propStatus } = useTamboStreamStatus<UserCardProps>();
+
+  // Access nested property status
+  const userStatus = propStatus.user as any;
+  const nameStatus = userStatus?.name;
+  const profileStatus = userStatus?.profile as any;
+  const bioStatus = profileStatus?.bio;
+
+  return (
+    <div>
+      <h3 className={nameStatus?.isStreaming ? "animate-pulse" : ""}>
+        {props.user.name}
+      </h3>
+      {nameStatus?.isSuccess && <p>{props.user.email}</p>}
+      {bioStatus?.isStreaming && <p>Loading bio...</p>}
+      {bioStatus?.isSuccess && <p>{props.user.profile.bio}</p>}
+    </div>
+  );
+}
+```
+
+### Array Properties
+
+Access completed and streaming items from array properties:
+
+```tsx
+interface RecipeListProps {
+  recipes: Array<{
+    id: string;
+    title: string;
+    ingredients: string[];
+  }>;
+}
+
+function RecipeList(props: RecipeListProps) {
+  const { propStatus } = useTamboStreamStatus<RecipeListProps>();
+
+  const recipesStatus = propStatus.recipes as any;
+  const completedRecipes = recipesStatus?.completedItems || [];
+  const streamingRecipes = recipesStatus?.streamingItems || [];
+
+  return (
+    <div>
+      {completedRecipes.map((recipe) => (
+        <RecipeCard key={recipe.id} {...recipe} />
+      ))}
+
+      {streamingRecipes.map((recipe, index) => (
+        <RecipeCard key={`streaming-${index}`} {...recipe} isLoading />
+      ))}
+
+      {recipesStatus?.isStreaming && (
+        <p>Loading {streamingRecipes.length} more recipes...</p>
+      )}
     </div>
   );
 }
