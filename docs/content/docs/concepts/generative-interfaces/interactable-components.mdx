@@ -43,3 +43,24 @@ Place these wherever you normally would within the application to enable a tradi
   href="/guides/enable-generative-ui/register-interactables"
   icon={Rocket}
 />
+
+## Automatic Interactables
+
+By default, you need to explicitly wrap components with `withTamboInteractable` to make them interactable. However, Tambo can automatically make all AI-generated components interactable, allowing users to update them in place instead of generating new ones.
+
+Enable this by setting `autoAddComponentsToInteractables` on your `TamboProvider`:
+
+```tsx
+<TamboProvider
+  apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY}
+  components={components}
+  autoAddComponentsToInteractables={true}
+>
+  <ChatInterface />
+</TamboProvider>
+```
+
+When enabled, any component Tambo generates in response to a user message is automatically registered as an interactable. This means instead of generating a completely new component when the user asks to modify it, Tambo will update the existing component's props in place.
+
+This is particularly useful when you want all generated components to be editable without manually wrapping each one. The generated components behave exactly like manually wrapped interactables, with the same automatic context sending and tool registration.
+

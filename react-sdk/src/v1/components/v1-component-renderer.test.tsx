@@ -4,6 +4,10 @@ import { z } from "zod";
 import { ComponentRenderer } from "./v1-component-renderer";
 import { TamboRegistryContext } from "../../providers/tambo-registry-provider";
 import type { TamboRegistryContext as TamboRegistryContextType } from "../../providers/tambo-registry-provider";
+import {
+  TamboInteractableProvider,
+  useTamboInteractable,
+} from "../../providers/tambo-interactable-provider";
 import type { TamboComponentContent } from "../types/message";
 
 // Simple test component

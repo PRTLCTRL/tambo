@@ -63,6 +63,12 @@ export interface TamboConfig {
    * These are displayed in the UI immediately and sent to the API on first message.
    */
   initialMessages?: InitialInputMessage[];
+  /**
+   * When enabled, all AI-generated components are automatically added as interactables,
+   * allowing them to be updated in place via AI conversation.
+   * Defaults to false.
+   */
+  autoAddComponentsToInteractables?: boolean;
 }
 
 /**
@@ -173,6 +179,13 @@ export interface TamboProviderProps extends Pick<
   initialMessages?: InitialInputMessage[];
 
   /**
+   * When enabled, all AI-generated components are automatically added as interactables,
+   * allowing them to be updated in place via AI conversation instead of generating new ones.
+   * Defaults to false.
+   */
+  autoAddComponentsToInteractables?: boolean;
+
+  /**
    * Children components
    */
   children: React.ReactNode;
@@ -238,6 +251,7 @@ function TamboAuthWarnings(): null {
  * @param props.autoGenerateThreadName - Whether to automatically generate thread names. Defaults to true.
  * @param props.autoGenerateNameThreshold - The message count threshold at which the thread name will be auto-generated. Defaults to 3.
  * @param props.initialMessages - Optional initial messages to prepend to the first thread.
+ * @param props.autoAddComponentsToInteractables - When enabled, automatically add generated components as interactables. Defaults to false.
  * @param props.children - Child components
  * @returns Provider component tree
  * @example
@@ -274,6 +288,7 @@ export function TamboProvider({
   autoGenerateThreadName,
   autoGenerateNameThreshold,
   initialMessages,
+  autoAddComponentsToInteractables,
   children,
 }: PropsWithChildren<TamboProviderProps>) {
   // Config is static - created once and never changes
@@ -282,6 +297,7 @@ export function TamboProvider({
     autoGenerateThreadName,
     autoGenerateNameThreshold,
     initialMessages,
+    autoAddComponentsToInteractables,
   };
 
   return (
@@ -305,7 +321,11 @@ export function TamboProvider({
           <TamboMcpTokenProvider>
             <TamboMcpProvider>
               <TamboContextAttachmentProvider>
-                <TamboInteractableProvider>
+                <TamboInteractableProvider
+                  autoAddComponentsToInteractables={
+                    autoAddComponentsToInteractables
+                  }
+                >
                   <TamboConfigContext.Provider value={config}>
                     <TamboAuthWarnings />
                     <TamboStreamProvider initialMessages={initialMessages}>
