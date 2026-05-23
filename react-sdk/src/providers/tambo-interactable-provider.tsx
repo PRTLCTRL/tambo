@@ -421,16 +421,16 @@ export const TamboInteractableProvider: React.FC<PropsWithChildren> = ({
   const addInteractableComponent = useCallback(
     (
       component: Omit<TamboInteractableComponent, "id" | "createdAt">,
+      id?: string,
     ): string => {
       // Validate component name
       assertValidName(component.name, "component");
 
-      // Add a random part to the component name to make it unique when using multiple instances of the same component.
-      const tamboGeneratedNamePart = `-${Math.random().toString(36).slice(2, 5)}`;
-      const id = `${component.name}${tamboGeneratedNamePart}`;
+      // Use provided ID or generate a new one
+      const componentId = id ?? `${component.name}-${Math.random().toString(36).slice(2, 5)}`;
       const newComponent: TamboInteractableComponent = {
         ...component,
-        id,
+        id: componentId,
         state: component.state ?? {},
       };
 
@@ -441,7 +441,7 @@ export const TamboInteractableProvider: React.FC<PropsWithChildren> = ({
         return [...prev, newComponent];
       });
 
-      return id;
+      return componentId;
     },
     [
       registerInteractableComponentPropsUpdateTool,
