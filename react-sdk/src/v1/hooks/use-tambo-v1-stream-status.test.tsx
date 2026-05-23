@@ -484,4 +484,280 @@ describe("useTamboStreamStatus", () => {
       consoleSpy.mockRestore();
     });
   });
+
+  describe("Nested Object Support", () => {
+    it("should track nested object properties independently", () => {
+      interface NestedProps {
+        user: {
+          name: string;
+          email: string;
+        };
+      }
+
+      const componentContent = createComponentContent({
+        props: {
+          user: {
+            name: "John",
+            email: "",
+          },
+        },
+        streamingState: "streaming",
+      });
+      const message = createMessage(componentContent);
+      const threadState = createThreadState([message]);
+      mockUseStreamState.mockReturnValue(createStreamState(threadState));
+
+      const { result } = renderHook(() => useTamboStreamStatus<NestedProps>());
+
+      // User object itself has content
+      expect(result.current.propStatus.user?.isStreaming).toBe(true);
+
+      // Name has content and is streaming
+      const userStatus = result.current.propStatus.user as {
+        name?: { isStreaming: boolean; isPending: boolean };
+        email?: { isStreaming: boolean; isPending: boolean };
+      };
+      expect(userStatus.name?.isStreaming).toBe(true);
+      expect(userStatus.name?.isPending).toBe(false);
+
+      // Email is empty, so it's pending
+      expect(userStatus.email?.isPending).toBe(true);
+      expect(userStatus.email?.isStreaming).toBe(false);
+    });
+
+    it("should mark nested properties as success when streaming completes", () => {
+      interface NestedProps {
+        user: {
+          name: string;
+          email: string;
+        };
+      }
+
+      const componentContent = createComponentContent({
+        props: {
+          user: {
+            name: "John Doe",
+            email: "john@example.com",
+          },
+        },
+        streamingState: "done",
+      });
+      const message = createMessage(componentContent);
+      const threadState = createThreadState([message]);
+      mockUseStreamState.mockReturnValue(createStreamState(threadState));
+
+      const { result } = renderHook(() => useTamboStreamStatus<NestedProps>());
+
+      expect(result.current.streamStatus.isSuccess).toBe(true);
+
+      // Access nested status
+      const userStatus = result.current.propStatus.user as {
+        name?: { isSuccess: boolean };
+        email?: { isSuccess: boolean };
+      };
+      expect(userStatus.name?.isSuccess).toBe(true);
+      expect(userStatus.email?.isSuccess).toBe(true);
+    });
+
+    it("should handle deeply nested objects", () => {
+      interface DeeplyNestedProps {
+        data: {
+          user: {
+            profile: {
+              name: string;
+            };
+          };
+        };
+      }
+
+      const componentContent = createComponentContent({
+        props: {
+          data: {
+            user: {
+              profile: {
+                name: "Alice",
+              },
+            },
+          },
+        },
+        streamingState: "streaming",
+      });
+      const message = createMessage(componentContent);
+      const threadState = createThreadState([message]);
+      mockUseStreamState.mockReturnValue(createStreamState(threadState));
+
+      const { result } = renderHook(() =>
+        useTamboStreamStatus<DeeplyNestedProps>(),
+      );
+
+      const dataStatus = result.current.propStatus.data as {
+        user?: {
+          profile?: {
+            name?: { isStreaming: boolean };
+          };
+        };
+      };
+
+      expect(dataStatus.user?.profile?.name?.isStreaming).toBe(true);
+    });
+  });
+
+  describe("Array Support", () => {
+    it("should provide completedItems and streamingItems for arrays", () => {
+      interface ArrayProps {
+        items: string[];
+      }
+
+      const componentContent = createComponentContent({
+        props: {
+          items: ["item1", "item2"],
+        },
+        streamingState: "streaming",
+      });
+      const message = createMessage(componentContent);
+      const threadState = createThreadState([message]);
+      mockUseStreamState.mockReturnValue(createStreamState(threadState));
+
+      const { result } = renderHook(() => useTamboStreamStatus<ArrayProps>());
+
+      const itemsStatus = result.current.propStatus.items as {
+        completedItems?: string[];
+        streamingItems?: string[];
+      };
+
+      // During streaming, items are in streamingItems
+      expect(itemsStatus.streamingItems).toEqual(["item1", "item2"]);
+      expect(itemsStatus.completedItems).toEqual([]);
+    });
+
+    it("should move items to completedItems when streaming finishes", () => {
+      interface ArrayProps {
+        items: string[];
+      }
+
+      const componentContent = createComponentContent({
+        props: {
+          items: ["item1", "item2", "item3"],
+        },
+        streamingState: "done",
+      });
+      const message = createMessage(componentContent);
+      const threadState = createThreadState([message]);
+      mockUseStreamState.mockReturnValue(createStreamState(threadState));
+
+      const { result } = renderHook(() => useTamboStreamStatus<ArrayProps>());
+
+      const itemsStatus = result.current.propStatus.items as {
+        completedItems?: string[];
+        streamingItems?: string[];
+        isSuccess?: boolean;
+      };
+
+      // After streaming, items are in completedItems
+      expect(itemsStatus.completedItems).toEqual(["item1", "item2", "item3"]);
+      expect(itemsStatus.streamingItems).toEqual([]);
+      expect(itemsStatus.isSuccess).toBe(true);
+    });
+
+    it("should handle empty arrays", () => {
+      interface ArrayProps {
+        items: string[];
+      }
+
+      const componentContent = createComponentContent({
+        props: {
+          items: [],
+        },
+        streamingState: "started",
+      });
+      const message = createMessage(componentContent);
+      const threadState = createThreadState([message]);
+      mockUseStreamState.mockReturnValue(createStreamState(threadState));
+
+      const { result } = renderHook(() => useTamboStreamStatus<ArrayProps>());
+
+      const itemsStatus = result.current.propStatus.items as {
+        completedItems?: string[];
+        streamingItems?: string[];
+        isPending?: boolean;
+      };
+
+      // Empty array is pending
+      expect(itemsStatus.isPending).toBe(true);
+      expect(itemsStatus.completedItems).toEqual([]);
+      expect(itemsStatus.streamingItems).toEqual([]);
+    });
+
+    it("should handle arrays of objects", () => {
+      interface ArrayProps {
+        users: Array<{ name: string; age: number }>;
+      }
+
+      const componentContent = createComponentContent({
+        props: {
+          users: [
+            { name: "Alice", age: 30 },
+            { name: "Bob", age: 25 },
+          ],
+        },
+        streamingState: "streaming",
+      });
+      const message = createMessage(componentContent);
+      const threadState = createThreadState([message]);
+      mockUseStreamState.mockReturnValue(createStreamState(threadState));
+
+      const { result } = renderHook(() => useTamboStreamStatus<ArrayProps>());
+
+      const usersStatus = result.current.propStatus.users as {
+        streamingItems?: Array<{ name: string; age: number }>;
+      };
+
+      expect(usersStatus.streamingItems).toHaveLength(2);
+      expect(usersStatus.streamingItems?.[0]).toEqual({
+        name: "Alice",
+        age: 30,
+      });
+    });
+  });
+
+  describe("Mixed Nested and Array Support", () => {
+    it("should handle nested objects with array properties", () => {
+      interface MixedProps {
+        data: {
+          title: string;
+          items: string[];
+        };
+      }
+
+      const componentContent = createComponentContent({
+        props: {
+          data: {
+            title: "My List",
+            items: ["a", "b"],
+          },
+        },
+        streamingState: "streaming",
+      });
+      const message = createMessage(componentContent);
+      const threadState = createThreadState([message]);
+      mockUseStreamState.mockReturnValue(createStreamState(threadState));
+
+      const { result } = renderHook(() => useTamboStreamStatus<MixedProps>());
+
+      const dataStatus = result.current.propStatus.data as {
+        title?: { isStreaming: boolean };
+        items?: {
+          streamingItems?: string[];
+          completedItems?: string[];
+        };
+      };
+
+      // Title is streaming
+      expect(dataStatus.title?.isStreaming).toBe(true);
+
+      // Items array is streaming
+      expect(dataStatus.items?.streamingItems).toEqual(["a", "b"]);
+      expect(dataStatus.items?.completedItems).toEqual([]);
+    });
+  });
 });

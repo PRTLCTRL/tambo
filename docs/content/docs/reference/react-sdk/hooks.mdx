@@ -384,7 +384,7 @@ function EditableCard({ title: initialTitle }: { title: string }) {
 
 ## useTamboStreamStatus
 
-Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity.
+Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity, including support for nested objects and arrays.
 
 **Important**: Props update repeatedly during streaming and may be partial. Use `propStatus.<field>?.isSuccess` before treating a prop as complete.
 
@@ -418,6 +418,87 @@ function MyComponent(props: MyProps) {
   This hook only works inside components rendered via `ComponentRenderer`. The
   renderer provides the necessary context for tracking streaming state.
 </Callout>
+
+### Nested Object Support
+
+For props with nested objects, `propStatus` provides a nested structure that mirrors your prop shape:
+
+```tsx
+interface UserCardProps {
+  user: {
+    name: string;
+    email: string;
+    profile: {
+      bio: string;
+    };
+  };
+}
+
+function UserCard({ user }: UserCardProps) {
+  const { propStatus } = useTamboStreamStatus<UserCardProps>();
+
+  return (
+    <div>
+      {/* Access nested property status */}
+      <h2 className={propStatus.user?.name?.isStreaming ? "animate-pulse" : ""}>
+        {user.name}
+      </h2>
+      <p className={propStatus.user?.email?.isStreaming ? "animate-pulse" : ""}>
+        {user.email}
+      </p>
+      <p
+        className={
+          propStatus.user?.profile?.bio?.isStreaming ? "animate-pulse" : ""
+        }
+      >
+        {user.profile.bio}
+      </p>
+    </div>
+  );
+}
+```
+
+### Array Support
+
+For array props, `propStatus` includes `completedItems` and `streamingItems` to access items by their streaming state:
+
+```tsx
+interface TodoListProps {
+  todos: Array<{ id: string; title: string; done: boolean }>;
+}
+
+function TodoList({ todos }: TodoListProps) {
+  const { propStatus } = useTamboStreamStatus<TodoListProps>();
+
+  // Get items that have finished streaming
+  const completed = propStatus.todos?.completedItems || [];
+  const streaming = propStatus.todos?.streamingItems || [];
+
+  return (
+    <div>
+      <h3>Completed Todos ({completed.length})</h3>
+      <ul>
+        {completed.map((todo) => (
+          <li key={todo.id}>{todo.title}</li>
+        ))}
+      </ul>
+
+      {streaming.length > 0 && (
+        <>
+          <h3>Loading... ({streaming.length})</h3>
+          <ul className="animate-pulse">
+            {streaming.map((todo) => (
+              <li key={todo.id}>{todo.title}</li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+```
+
+This allows you to render completed items immediately while showing loading states for items still streaming.
 
 ## useTamboSuggestions
 
