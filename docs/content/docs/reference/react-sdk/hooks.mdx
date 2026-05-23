@@ -384,9 +384,11 @@ function EditableCard({ title: initialTitle }: { title: string }) {
 
 ## useTamboStreamStatus
 
-Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity.
+Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity, including nested objects and arrays.
 
 **Important**: Props update repeatedly during streaming and may be partial. Use `propStatus.<field>?.isSuccess` before treating a prop as complete.
+
+### Basic Usage
 
 ```tsx
 import { useTamboStreamStatus } from "@tambo-ai/react";
@@ -402,6 +404,86 @@ function MyComponent(props: MyProps) {
         {props.title}
       </h2>
       {streamStatus.isSuccess && <p>Stream complete</p>}
+    </div>
+  );
+}
+```
+
+### Nested Object Tracking
+
+Track streaming status for nested object properties:
+
+```tsx
+interface UserCardProps {
+  user: {
+    name: string;
+    email: string;
+    profile: {
+      bio: string;
+      avatar: string;
+    };
+  };
+}
+
+function UserCard(props: UserCardProps) {
+  const { propStatus } = useTamboStreamStatus<UserCardProps>();
+
+  return (
+    <div>
+      <h3
+        className={propStatus.user?.name?.isStreaming ? "animate-pulse" : ""}
+      >
+        {props.user.name}
+      </h3>
+      <p className={propStatus.user?.email?.isStreaming ? "animate-pulse" : ""}>
+        {props.user.email}
+      </p>
+      {propStatus.user?.profile?.bio?.isSuccess && (
+        <p>{props.user.profile.bio}</p>
+      )}
+    </div>
+  );
+}
+```
+
+### Array Item Tracking
+
+Track completed and streaming items in array props:
+
+```tsx
+interface RecipeListProps {
+  recipes: Array<{
+    id: string;
+    title: string;
+    ingredients: string[];
+  }>;
+}
+
+function RecipeList(props: RecipeListProps) {
+  const { propStatus } = useTamboStreamStatus<RecipeListProps>();
+
+  const completedRecipes = propStatus.recipes?.completedItems || [];
+  const streamingRecipes = propStatus.recipes?.streamingItems || [];
+
+  return (
+    <div>
+      <h2>Recipes</h2>
+      {completedRecipes.map((recipe: any) => (
+        <div key={recipe.id}>
+          <h3>{recipe.title}</h3>
+          <ul>
+            {recipe.ingredients.map((ingredient: string, i: number) => (
+              <li key={i}>{ingredient}</li>
+            ))}
+          </ul>
+        </div>
+      ))}
+      {streamingRecipes.map((recipe: any, i: number) => (
+        <div key={i} className="animate-pulse">
+          <h3>{recipe.title || "Loading..."}</h3>
+          <p>Streaming recipe details...</p>
+        </div>
+      ))}
     </div>
   );
 }
