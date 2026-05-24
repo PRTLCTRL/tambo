@@ -645,6 +645,78 @@ interface PropStatus {
 | `isSuccess`   | `boolean` | This prop has finished streaming successfully      |
 | `error`       | `Error`   | Error that occurred during streaming for this prop |
 
+### ArrayPropStatus
+
+Extended status for array props, includes lists of completed and streaming items.
+
+```typescript
+interface ArrayPropStatus<T = unknown> extends PropStatus {
+  completedItems: T[];
+  streamingItems: T[];
+}
+```
+
+| Property          | Type  | Description                                                   |
+| ----------------- | ----- | ------------------------------------------------------------- |
+| `completedItems`  | `T[]` | Array items that have finished streaming (empty while streaming) |
+| `streamingItems`  | `T[]` | Array items currently being streamed (empty when complete)       |
+
+**Usage:**
+
+```typescript
+interface TaskListProps {
+  tasks: Array<{ id: string; title: string }>;
+}
+
+const { propStatus } = useTamboStreamStatus<TaskListProps>();
+
+// Access completed items
+const completed = propStatus.tasks?.completedItems ?? [];
+// Access streaming items  
+const streaming = propStatus.tasks?.streamingItems ?? [];
+```
+
+### NestedPropStatus
+
+Recursive type for tracking nested object and array prop statuses.
+
+```typescript
+type NestedPropStatus<T = unknown> = T extends Array<infer U>
+  ? ArrayPropStatus<U>
+  : T extends object
+    ? PropStatus & { [K in keyof T]?: NestedPropStatus<T[K]> }
+    : PropStatus;
+```
+
+This type automatically provides:
+- `ArrayPropStatus` for array props
+- Nested `PropStatus` objects for object props
+- Regular `PropStatus` for primitive props
+
+**Usage:**
+
+```typescript
+interface UserProps {
+  user: {
+    name: string;
+    profile: {
+      bio: string;
+    };
+  };
+  tags: string[];
+}
+
+const { propStatus } = useTamboStreamStatus<UserProps>();
+
+// Access nested object status
+propStatus.user?.name?.isStreaming
+propStatus.user?.profile?.bio?.isSuccess
+
+// Access array status
+propStatus.tags?.completedItems
+propStatus.tags?.streamingItems
+```
+
 ## Tool Annotations
 
 ### ToolAnnotations

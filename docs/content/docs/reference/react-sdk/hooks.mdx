@@ -384,7 +384,7 @@ function EditableCard({ title: initialTitle }: { title: string }) {
 
 ## useTamboStreamStatus
 
-Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity.
+Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity with support for nested objects and arrays.
 
 **Important**: Props update repeatedly during streaming and may be partial. Use `propStatus.<field>?.isSuccess` before treating a prop as complete.
 
@@ -407,12 +407,76 @@ function MyComponent(props: MyProps) {
 }
 ```
 
+### Nested Object Support
+
+Track streaming status of deeply nested properties:
+
+```tsx
+interface UserCardProps {
+  user: {
+    name: string;
+    email: string;
+    profile: {
+      bio: string;
+      avatar: string;
+    };
+  };
+}
+
+function UserCard(props: UserCardProps) {
+  const { propStatus } = useTamboStreamStatus<UserCardProps>();
+
+  return (
+    <div>
+      <h3 className={propStatus.user?.name?.isStreaming ? "animate-pulse" : ""}>
+        {props.user.name}
+      </h3>
+      <p className={propStatus.user?.email?.isStreaming ? "animate-pulse" : ""}>
+        {props.user.email}
+      </p>
+      {propStatus.user?.profile?.bio?.isSuccess && (
+        <p>{props.user.profile.bio}</p>
+      )}
+    </div>
+  );
+}
+```
+
+### Array Support
+
+Access completed and streaming items separately:
+
+```tsx
+interface TaskListProps {
+  tasks: Array<{ id: string; title: string; done: boolean }>;
+}
+
+function TaskList(props: TaskListProps) {
+  const { propStatus } = useTamboStreamStatus<TaskListProps>();
+
+  // Only render completed items while streaming
+  const completedTasks = propStatus.tasks?.completedItems ?? [];
+  const isStreamingTasks = propStatus.tasks?.isStreaming ?? false;
+
+  return (
+    <div>
+      <ul>
+        {completedTasks.map((task) => (
+          <li key={task.id}>{task.title}</li>
+        ))}
+      </ul>
+      {isStreamingTasks && <Spinner />}
+    </div>
+  );
+}
+```
+
 ### Return Values
 
-| Value          | Type                                                      | Description                                                                                                                                    |
-| -------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `streamStatus` | [`StreamStatus`](/reference/react-sdk/types#streamstatus) | Overall streaming status for the component                                                                                                     |
-| `propStatus`   | `Partial<Record<keyof Props, PropStatus>>`                | Per-prop streaming status. Keys are absent until the prop receives its first token. See [`PropStatus`](/reference/react-sdk/types#propstatus). |
+| Value          | Type                                                      | Description                                                                                                                                                                                        |
+| -------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `streamStatus` | [`StreamStatus`](/reference/react-sdk/types#streamstatus) | Overall streaming status for the component                                                                                                                                                         |
+| `propStatus`   | `Partial<Record<keyof Props, NestedPropStatus>>`          | Per-prop streaming status with nested support. Keys are absent until the prop receives its first token. See [`PropStatus`](/reference/react-sdk/types#propstatus) and `NestedPropStatus` for details. |
 
 <Callout type="info">
   This hook only works inside components rendered via `ComponentRenderer`. The
