@@ -384,7 +384,7 @@ function EditableCard({ title: initialTitle }: { title: string }) {
 
 ## useTamboStreamStatus
 
-Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity.
+Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity, including support for nested objects and arrays.
 
 **Important**: Props update repeatedly during streaming and may be partial. Use `propStatus.<field>?.isSuccess` before treating a prop as complete.
 
@@ -413,6 +413,78 @@ function MyComponent(props: MyProps) {
 | -------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | `streamStatus` | [`StreamStatus`](/reference/react-sdk/types#streamstatus) | Overall streaming status for the component                                                                                                     |
 | `propStatus`   | `Partial<Record<keyof Props, PropStatus>>`                | Per-prop streaming status. Keys are absent until the prop receives its first token. See [`PropStatus`](/reference/react-sdk/types#propstatus). |
+
+### Nested Object Support
+
+The hook supports tracking streaming status for nested object properties. Access nested property status by traversing the status object:
+
+```tsx
+interface UserProps {
+  user: {
+    name: string;
+    email: string;
+    profile: {
+      bio: string;
+    };
+  };
+}
+
+function UserCard(props: UserProps) {
+  const { propStatus } = useTamboStreamStatus<UserProps>();
+
+  return (
+    <div>
+      {/* Track parent object status */}
+      {propStatus.user?.isStreaming && <Spinner />}
+
+      {/* Track nested property status */}
+      <h3 className={propStatus.user?.name?.isStreaming ? "animate-pulse" : ""}>
+        {props.user.name}
+      </h3>
+
+      {/* Track deeply nested property status */}
+      {propStatus.user?.profile?.bio?.isSuccess && (
+        <p>{props.user.profile.bio}</p>
+      )}
+    </div>
+  );
+}
+```
+
+### Array Support
+
+For array props, the hook provides `completedItems` and `streamingItems` to render partial arrays during streaming:
+
+```tsx
+interface ListProps {
+  items: Array<{ id: string; name: string }>;
+}
+
+function ItemList(props: ListProps) {
+  const { propStatus } = useTamboStreamStatus<ListProps>();
+
+  return (
+    <div>
+      {/* Render completed items */}
+      {propStatus.items?.completedItems?.map((item) => (
+        <div key={item.id}>{item.name}</div>
+      ))}
+
+      {/* Show loading state for streaming items */}
+      {propStatus.items?.streamingItems?.map((item, i) => (
+        <div key={`streaming-${i}`} className="animate-pulse">
+          {item.name}
+        </div>
+      ))}
+
+      {/* Wait for all items before showing action */}
+      {propStatus.items?.isSuccess && (
+        <button>Process all {props.items.length} items</button>
+      )}
+    </div>
+  );
+}
+```
 
 <Callout type="info">
   This hook only works inside components rendered via `ComponentRenderer`. The
