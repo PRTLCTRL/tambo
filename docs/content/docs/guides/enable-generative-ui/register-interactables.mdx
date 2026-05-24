@@ -6,7 +6,12 @@ description: This guide helps you make pre-placed components editable by Tambo t
 import LearnMore from "@/components/learn-more";
 import { BookOpen } from "lucide-react";
 
-This guide shows you how to register React components as "Interactable" so Tambo can modify their props in response to user messages. Unlike generative components that Tambo creates on-demand, Interactable components are pre-placed by you and allow Tambo to update them in place.
+This guide shows you how to make components interactable so Tambo can modify their props in response to user messages.
+
+There are two approaches:
+
+1. **Manual Interactables**: Wrap specific components with `withTamboInteractable` to make them updatable
+2. **Automatic Interactables**: Enable all AI-generated components to be automatically interactable
 
 <LearnMore
   title="Learn more about Interactable components"
@@ -14,6 +19,32 @@ This guide shows you how to register React components as "Interactable" so Tambo
   href="/concepts/generative-interfaces/interactable-components"
   icon={BookOpen}
 />
+
+## Automatic Interactables
+
+The fastest way to enable interactables is to turn on automatic mode. This makes every component Tambo generates automatically updatable.
+
+```tsx
+<TamboProvider
+  apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
+  components={components}
+  autoAddInteractables={true}
+>
+  <App />
+</TamboProvider>
+```
+
+With this enabled, users can ask Tambo to update any previously generated component:
+
+- "Update the chart to show monthly data instead"
+- "Change the note title to 'Important Reminder'"
+- "Make the weather card show celsius instead of fahrenheit"
+
+This is ideal when your UI displays only the most recent components rather than a full message history.
+
+## Manual Interactables
+
+For more control over which components are interactable, use manual registration by wrapping specific components with `withTamboInteractable`.
 
 ## Step 1: Build Your React Component
 

@@ -13,13 +13,15 @@
  */
 
 import { parse } from "partial-json";
-import React, { type FC, useMemo, useContext } from "react";
+import React, { type FC, useMemo, useContext, useEffect } from "react";
 import { TamboRegistryContext } from "../../providers/tambo-registry-provider";
+import { useTamboInteractable } from "../../providers/tambo-interactable-provider";
 import { isStandardSchema } from "../../schema";
 import { isPromise } from "../../util/is-promise";
 import { getComponentFromRegistry } from "../../util/registry";
 import type { TamboComponentContent } from "../types/message";
 import { ComponentContentProvider } from "../utils/component-renderer";
+import { useTamboConfig } from "../providers/tambo-v1-provider";
 
 export interface ComponentRendererProps {
   /**
@@ -76,6 +78,40 @@ export const ComponentRenderer: FC<ComponentRendererProps> = ({
   fallback = null,
 }) => {
   const registry = useContext(TamboRegistryContext);
+  const { addInteractableComponent } = useTamboInteractable();
+  const config = useTamboConfig();
+
+  // Auto-add component to interactables if enabled
+  useEffect(() => {
+    if (!config.autoAddInteractables) return;
+
+    try {
+      const registeredComponent = getComponentFromRegistry(
+        content.name,
+        registry.componentList,
+      );
+
+      // Add to interactables with the component's metadata
+      addInteractableComponent({
+        name: content.name,
+        description: registeredComponent.description ?? "",
+        props: content.props ?? {},
+        propsSchema: registeredComponent.props,
+      });
+    } catch (error) {
+      console.warn(
+        `[ComponentRenderer] Failed to auto-add component ${content.name} to interactables:`,
+        error,
+      );
+    }
+  }, [
+    config.autoAddInteractables,
+    content.name,
+    content.id,
+    content.props,
+    registry.componentList,
+    addInteractableComponent,
+  ]);
 
   // Memoize the rendered element - only recreates when props change
   const element = useMemo(() => {

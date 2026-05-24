@@ -14,6 +14,10 @@ This creates a conversational interface where traditional UI manipulation and na
 
 ## How Interactables Work
 
+There are two ways to make components interactable: manually wrapping them with `withTamboInteractable`, or enabling automatic interactables for all AI-generated components.
+
+### Manual Interactables
+
 Interactables are normal React components that you build and then wrap with Tambo's `withTamboInteractable` to give Tambo access to them.
 
 ```tsx
@@ -36,6 +40,28 @@ When you wrap a component with `withTamboInteractable`, Tambo creates an automat
 **Automatic Tool Registration**: Update tools are automatically registered to allow Tambo to update the component's props when needed.
 
 Place these wherever you normally would within the application to enable a traditional, statically-organized, user interface enhanced with AI capabilities.
+
+### Automatic Interactables
+
+Sometimes you want Tambo to be able to update previously-generated components without knowing ahead of time which components will be created. Enable automatic interactables to make all AI-generated components interactable by default.
+
+```tsx
+<TamboProvider
+  apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
+  components={components}
+  autoAddInteractables={true}
+>
+  <App />
+</TamboProvider>
+```
+
+With `autoAddInteractables` enabled, every component Tambo generates is automatically added to the interactables registry. Users can then ask Tambo to update those components just like manually-created interactables.
+
+This is useful when:
+
+- You want to display only the latest generated component rather than a full message history
+- Users frequently ask Tambo to refine or update previously generated content
+- Your UI shows a dashboard or workspace of AI-generated components that need to stay updatable
 
 <LearnMore
   title="How to register Interactable components"
