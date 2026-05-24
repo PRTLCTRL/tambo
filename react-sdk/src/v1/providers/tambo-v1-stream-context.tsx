@@ -32,6 +32,7 @@ import {
   type StreamState,
 } from "@tambo-ai/client";
 import { useTamboConfig } from "./tambo-v1-provider";
+import { AutoInteractablesManager } from "./tambo-auto-interactables-manager";
 
 /**
  * Thread management functions exposed by the stream context.
@@ -232,6 +233,7 @@ export function TamboStreamProvider(props: TamboStreamProviderProps) {
       <StreamDispatchContext.Provider value={activeDispatch}>
         <ThreadManagementContext.Provider value={threadManagement}>
           <ThreadSyncManager />
+          <AutoInteractablesManager />
           {children}
         </ThreadManagementContext.Provider>
       </StreamDispatchContext.Provider>
