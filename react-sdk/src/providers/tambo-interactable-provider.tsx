@@ -41,17 +41,27 @@ const TamboInteractableContext = createContext<TamboInteractableContext>({
 /** Synthetic owner ID used to track global interactable tools in the registry. */
 const GLOBAL_INTERACTABLE_OWNER = "__interactable_global__";
 
+export interface TamboInteractableProviderProps extends PropsWithChildren {
+  /**
+   * When enabled, automatically adds all generated components to the interactables list.
+   * This allows the AI to update previously-generated components without manual registration.
+   * @default false
+   */
+  autoAddComponentsToInteractables?: boolean;
+}
+
 /**
  * The TamboInteractableProvider manages a list of components that are currently
  * interactable, allowing tambo to interact with them by updating their props. It also registers tools
  * for Tambo to perform CRUD operations on the components list.
  * @param props - The props for the TamboInteractableProvider
  * @param props.children - The children to wrap
+ * @param props.autoAddComponentsToInteractables - When enabled, automatically adds generated components to interactables
  * @returns The TamboInteractableProvider component
  */
-export const TamboInteractableProvider: React.FC<PropsWithChildren> = ({
-  children,
-}) => {
+export const TamboInteractableProvider: React.FC<
+  TamboInteractableProviderProps
+> = ({ children, autoAddComponentsToInteractables = false }) => {
   const [interactableComponents, setInteractableComponents] = useState<
     TamboInteractableComponent[]
   >([]);

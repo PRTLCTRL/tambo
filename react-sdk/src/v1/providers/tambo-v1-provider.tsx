@@ -21,6 +21,7 @@ import React, {
   createContext,
   useContext,
   useEffect,
+  useRef,
   type PropsWithChildren,
 } from "react";
 import { useTamboAuthState } from "../hooks/use-tambo-v1-auth-state";
@@ -35,6 +36,7 @@ import {
 import { TamboContextAttachmentProvider } from "../../providers/tambo-context-attachment-provider";
 import { TamboContextHelpersProvider } from "../../providers/tambo-context-helpers-provider";
 import { TamboInteractableProvider } from "../../providers/tambo-interactable-provider";
+import { useTamboInteractable } from "../../providers/tambo-interactable-provider";
 import { TamboMcpTokenProvider } from "../../providers/tambo-mcp-token-provider";
 import { TamboMcpProvider } from "../../mcp/tambo-mcp-provider";
 import type { ContextHelpers } from "../../context-helpers";
@@ -44,8 +46,11 @@ import type {
   ResourceSource,
 } from "../../model/resource-info";
 import type { InitialInputMessage } from "../types/message";
-import { TamboStreamProvider } from "./tambo-v1-stream-context";
+import { TamboStreamProvider, useStreamState } from "./tambo-v1-stream-context";
 import { TamboThreadInputProvider } from "./tambo-v1-thread-input-provider";
+import { useTamboRegistry } from "../../providers/tambo-registry-provider";
+import { getComponentFromRegistry } from "../../util/registry";
+import type { TamboComponentContent } from "../types/message";
 
 /**
  * Configuration values for the SDK.
@@ -173,6 +178,13 @@ export interface TamboProviderProps extends Pick<
   initialMessages?: InitialInputMessage[];
 
   /**
+   * When enabled, automatically adds all generated components to the interactables list.
+   * This allows the AI to update previously-generated components without manual registration.
+   * @default false
+   */
+  autoAddComponentsToInteractables?: boolean;
+
+  /**
    * Children components
    */
   children: React.ReactNode;
@@ -212,6 +224,75 @@ function TamboAuthWarnings(): null {
 }
 
 /**
+ * Internal component that automatically adds generated components to interactables.
+ * Monitors the message stream and adds any new component content blocks to the
+ * interactable components list.
+ * @returns null (renders nothing).
+ */
+function AutoInteractablesMonitor(): null {
+  const state = useStreamState();
+  const { addInteractableComponent } = useTamboInteractable();
+  const registry = useTamboRegistry();
+  const processedComponentsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const currentThread = state.threadMap[state.currentThreadId];
+    if (!currentThread) return;
+
+    for (const message of currentThread.thread.messages) {
+      if (message.role !== "assistant") continue;
+
+      for (const content of message.content) {
+        if (content.type !== "component") continue;
+
+        const componentContent = content as TamboComponentContent;
+        const componentId = componentContent.id;
+
+        if (processedComponentsRef.current.has(componentId)) continue;
+
+        if (
+          componentContent.streamingState &&
+          componentContent.streamingState !== "complete"
+        ) {
+          continue;
+        }
+
+        try {
+          const registeredComponent = getComponentFromRegistry(
+            componentContent.name,
+            registry.componentList,
+          );
+
+          addInteractableComponent({
+            name: componentContent.name,
+            description:
+              registeredComponent.description ??
+              `Component: ${componentContent.name}`,
+            component: registeredComponent.component,
+            propsSchema: registeredComponent.props,
+            props: componentContent.props ?? {},
+          });
+
+          processedComponentsRef.current.add(componentId);
+        } catch (error) {
+          console.warn(
+            `[AutoInteractablesMonitor] Failed to add component ${componentContent.name} to interactables:`,
+            error,
+          );
+        }
+      }
+    }
+  }, [
+    state.currentThreadId,
+    state.threadMap,
+    addInteractableComponent,
+    registry.componentList,
+  ]);
+
+  return null;
+}
+
+/**
  * Main provider for the Tambo SDK.
  *
  * Composes TamboClientProvider, TamboRegistryProvider, and TamboStreamProvider
@@ -238,6 +319,7 @@ function TamboAuthWarnings(): null {
  * @param props.autoGenerateThreadName - Whether to automatically generate thread names. Defaults to true.
  * @param props.autoGenerateNameThreshold - The message count threshold at which the thread name will be auto-generated. Defaults to 3.
  * @param props.initialMessages - Optional initial messages to prepend to the first thread.
+ * @param props.autoAddComponentsToInteractables - Whether to automatically add generated components to interactables. Defaults to false.
  * @param props.children - Child components
  * @returns Provider component tree
  * @example
@@ -274,6 +356,7 @@ export function TamboProvider({
   autoGenerateThreadName,
   autoGenerateNameThreshold,
   initialMessages,
+  autoAddComponentsToInteractables = false,
   children,
 }: PropsWithChildren<TamboProviderProps>) {
   // Config is static - created once and never changes
@@ -305,10 +388,17 @@ export function TamboProvider({
           <TamboMcpTokenProvider>
             <TamboMcpProvider>
               <TamboContextAttachmentProvider>
-                <TamboInteractableProvider>
+                <TamboInteractableProvider
+                  autoAddComponentsToInteractables={
+                    autoAddComponentsToInteractables
+                  }
+                >
                   <TamboConfigContext.Provider value={config}>
                     <TamboAuthWarnings />
                     <TamboStreamProvider initialMessages={initialMessages}>
+                      {autoAddComponentsToInteractables && (
+                        <AutoInteractablesMonitor />
+                      )}
                       <TamboThreadInputProvider>
                         {children}
                       </TamboThreadInputProvider>
