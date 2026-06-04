@@ -43,3 +43,37 @@ Place these wherever you normally would within the application to enable a tradi
   href="/guides/enable-generative-ui/register-interactables"
   icon={Rocket}
 />
+
+## Automatic Interactables
+
+Sometimes you want all generated components to be interactable without pre-placing them on screen. Tambo can automatically register every component it generates as an interactable, letting users update any previously-generated component through subsequent requests.
+
+Enable this by setting `autoAddToInteractables` on `TamboProvider`:
+
+```tsx
+<TamboProvider
+  apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
+  userKey={currentUserId}
+  components={components}
+  autoAddToInteractables={true}
+>
+  <App />
+</TamboProvider>
+```
+
+When enabled, every component Tambo generates becomes automatically interactable. Instead of displaying the full message thread, you can show only the list of interactables and let users modify them conversationally.
+
+**Example flow:**
+
+1. User: "Create a todo list with 3 items"
+2. Tambo generates a TodoList component (automatically added to interactables)
+3. User: "Add 2 more items to that todo list"
+4. Tambo updates the previously-generated TodoList component
+
+This is different from manually wrapping components with `withTamboInteractable` because:
+
+- Components are added **after generation** rather than pre-placed
+- You don't control the initial placement or state
+- Users interact with a dynamic collection of components rather than specific pre-defined ones
+
+Use automatic interactables when you want a flexible, chat-driven interface where the set of components evolves with the conversation. Use manual interactables when you want specific components in specific places with predefined initial states.
