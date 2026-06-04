@@ -8,6 +8,10 @@ import { BookOpen } from "lucide-react";
 
 This guide shows you how to register React components as "Interactable" so Tambo can modify their props in response to user messages. Unlike generative components that Tambo creates on-demand, Interactable components are pre-placed by you and allow Tambo to update them in place.
 
+Tambo offers two approaches:
+1. **Automatic Interactables**: Enable `autoInteractables` prop on `TamboProvider` to automatically make all AI-generated components interactable
+2. **Manual Interactables**: Explicitly wrap specific components with `withTamboInteractable` for precise control
+
 <LearnMore
   title="Learn more about Interactable components"
   description="Understand what Interactable components are and when to use them"
@@ -15,7 +19,61 @@ This guide shows you how to register React components as "Interactable" so Tambo
   icon={BookOpen}
 />
 
-## Step 1: Build Your React Component
+## Automatic Interactables (Recommended for Chat Interfaces)
+
+If you want all AI-generated components to be automatically interactable, enable the `autoInteractables` prop on `TamboProvider`:
+
+```tsx
+import { TamboProvider } from "@tambo-ai/react";
+import { Note, WeatherCard } from "./components";
+import { NotePropsSchema, WeatherCardPropsSchema } from "./schemas";
+
+const components = [
+  {
+    name: "Note",
+    description: "A simple note component",
+    component: Note,
+    propsSchema: NotePropsSchema,
+  },
+  {
+    name: "WeatherCard",
+    description: "Shows weather for a city",
+    component: WeatherCard,
+    propsSchema: WeatherCardPropsSchema,
+  },
+];
+
+export default function App() {
+  return (
+    <TamboProvider
+      apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
+      userKey="user-123"
+      components={components}
+      autoInteractables={true}
+    >
+      <ChatInterface />
+    </TamboProvider>
+  );
+}
+```
+
+With `autoInteractables={true}`:
+- Any component Tambo generates becomes automatically interactable
+- Users can modify these components through conversation
+- Perfect for dynamic chat interfaces where you don't know which components will appear ahead of time
+- No need to manually place components or wrap them with `withTamboInteractable`
+
+For example, users can say:
+- "Show me the weather in Seattle" → Tambo generates a WeatherCard
+- "Change it to Tokyo" → Tambo updates the existing WeatherCard's city prop
+- "Create a note about this meeting" → Tambo generates a Note
+- "Update the note's title to 'Team Standup'" → Tambo updates the Note's title prop
+
+## Manual Interactables (For Pre-Placed Components)
+
+If you want to pre-place specific components in your UI and make them interactable, use the `withTamboInteractable` wrapper.
+
+### Step 1: Build Your React Component
 
 Create a standard React component that accepts props.
 
@@ -51,7 +109,7 @@ function Note({ title, content }: NoteProps) {
 }
 ```
 
-## Step 2: Define Your Props Schema
+### Step 2: Define Your Props Schema
 
 Create a Zod schema that describes which props Tambo can modify:
 
@@ -70,7 +128,7 @@ This schema tells Tambo:
 - What types and values are valid
 - Which props are optional
 
-## Step 3: Wrap with `withTamboInteractable`
+### Step 3: Wrap with `withTamboInteractable`
 
 Use `withTamboInteractable` to create an Interactable version of your component:
 
@@ -98,7 +156,7 @@ Unlike generative components, Interactable components register themselves automa
 
 </Callout>
 
-## Step 4: Render in Your App
+### Step 4: Render in Your App
 
 Place the Interactable component in your app where you want it to appear, within the `TamboProvider`:
 
@@ -127,7 +185,7 @@ Tambo can now see and modify this component when users send messages like:
 
 ## Complete Example
 
-Here's a complete working example:
+Here's a complete working example using manual interactables:
 
 ```tsx
 import {

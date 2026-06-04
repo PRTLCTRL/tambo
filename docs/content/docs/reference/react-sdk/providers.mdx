@@ -28,24 +28,25 @@ function App() {
 
 ### Props
 
-| Prop                        | Type                                             | Required | Description                                                            |
-| --------------------------- | ------------------------------------------------ | -------- | ---------------------------------------------------------------------- |
-| `apiKey`                    | `string`                                         | Yes      | Your Tambo API key                                                     |
-| `userToken`                 | `string`                                         | No\*     | OAuth token for user authentication                                    |
-| `userKey`                   | `string`                                         | No\*     | Unique identifier for the current user                                 |
-| `tamboUrl`                  | `string`                                         | No       | Custom Tambo API URL                                                   |
-| `environment`               | `string`                                         | No       | Environment name                                                       |
-| `components`                | `TamboComponent[]`                               | No       | Components to register                                                 |
-| `tools`                     | `TamboTool[]`                                    | No       | Tools to register                                                      |
-| `mcpServers`                | `(McpServerInfo \| string)[]`                    | No       | MCP servers to connect                                                 |
-| `contextHelpers`            | `ContextHelpers`                                 | No       | Context helper functions                                               |
-| `onCallUnregisteredTool`    | `(toolName: string) => void`                     | No       | Callback for unregistered tool calls                                   |
-| `resources`                 | `ListResourceItem[]`                             | No       | Static resources for MCP                                               |
-| `listResources`             | `(query: string) => Promise<ListResourceItem[]>` | No       | Dynamic resource listing                                               |
-| `getResource`               | `(uri: string) => Promise<ReadResourceResult>`   | No       | Resource content resolver                                              |
-| `initialMessages`           | `InitialInputMessage[]`                          | No       | Messages to seed new threads with, displayed before the first API call |
-| `autoGenerateThreadName`    | `boolean`                                        | No       | Auto-generate thread names after a message threshold (default: `true`) |
-| `autoGenerateNameThreshold` | `number`                                         | No       | Messages before auto-generating a thread name (default: `3`)           |
+| Prop                        | Type                                             | Required | Description                                                                                             |
+| --------------------------- | ------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------- |
+| `apiKey`                    | `string`                                         | Yes      | Your Tambo API key                                                                                      |
+| `userToken`                 | `string`                                         | No\*     | OAuth token for user authentication                                                                     |
+| `userKey`                   | `string`                                         | No\*     | Unique identifier for the current user                                                                  |
+| `tamboUrl`                  | `string`                                         | No       | Custom Tambo API URL                                                                                    |
+| `environment`               | `string`                                         | No       | Environment name                                                                                        |
+| `components`                | `TamboComponent[]`                               | No       | Components to register                                                                                  |
+| `tools`                     | `TamboTool[]`                                    | No       | Tools to register                                                                                       |
+| `mcpServers`                | `(McpServerInfo \| string)[]`                    | No       | MCP servers to connect                                                                                  |
+| `contextHelpers`            | `ContextHelpers`                                 | No       | Context helper functions                                                                                |
+| `onCallUnregisteredTool`    | `(toolName: string) => void`                     | No       | Callback for unregistered tool calls                                                                    |
+| `resources`                 | `ListResourceItem[]`                             | No       | Static resources for MCP                                                                                |
+| `listResources`             | `(query: string) => Promise<ListResourceItem[]>` | No       | Dynamic resource listing                                                                                |
+| `getResource`               | `(uri: string) => Promise<ReadResourceResult>`   | No       | Resource content resolver                                                                               |
+| `initialMessages`           | `InitialInputMessage[]`                          | No       | Messages to seed new threads with, displayed before the first API call                                  |
+| `autoGenerateThreadName`    | `boolean`                                        | No       | Auto-generate thread names after a message threshold (default: `true`)                                  |
+| `autoGenerateNameThreshold` | `number`                                         | No       | Messages before auto-generating a thread name (default: `3`)                                            |
+| `autoInteractables`         | `boolean`                                        | No       | Automatically add generated components to interactables list (default: `false`). See Automatic Interactables below. |
 
 \*Exactly one of `userToken` or `userKey` is required to identify the current user.
 
@@ -112,6 +113,31 @@ const tools = [
 6. `TamboConfigContext` - Configuration (userKey, etc.)
 7. `TamboStreamProvider` - Streaming state management
 8. `TamboThreadInputProvider` - Shared input state
+
+### Automatic Interactables
+
+When `autoInteractables` is set to `true`, Tambo automatically adds all AI-generated components to the interactables list. This allows users to modify these components through natural language conversation without manually wrapping them with `withTamboInteractable`.
+
+```tsx
+<TamboProvider
+  apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY}
+  userKey={userId}
+  components={myComponents}
+  autoInteractables={true}
+>
+  <ChatInterface />
+</TamboProvider>
+```
+
+With this enabled:
+- Any component Tambo generates in response to user messages becomes automatically interactable
+- Users can ask Tambo to modify generated components (e.g., "update that weather card to show Tokyo")
+- The component registry must include all components that might be generated (via the `components` prop)
+- Each component must have a `propsSchema` defined for Tambo to know which props can be updated
+
+This is ideal for chat-style interfaces where the component list is dynamic and you want all generated components to be editable through conversation.
+
+For more control over which components are interactable, use manual interactables by wrapping specific components with `withTamboInteractable` instead. See the [Interactable Components guide](/guides/enable-generative-ui/register-interactables) for details.
 
 ## TamboStubProvider
 

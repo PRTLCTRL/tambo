@@ -12,6 +12,14 @@ You place them, set their initial state, and users can interact with them direct
 
 This creates a conversational interface where traditional UI manipulation and natural language interaction work together. A user might click and edit a note's title, then ask Tambo to "update the content of this note with today's meeting notes," both modifying the same component.
 
+## Manual vs Automatic Interactables
+
+Tambo offers two approaches for making components interactable:
+
+1. **Manual Interactables**: You explicitly wrap specific components with `withTamboInteractable` and place them in your UI where you want them. This gives you full control over which components are interactable and where they appear.
+
+2. **Automatic Interactables**: Enable the `autoInteractables` prop on `TamboProvider`, and Tambo automatically makes all AI-generated components interactable. This is useful when you want a dynamic interface where users can update any component Tambo generates through conversation.
+
 ## How Interactables Work
 
 Interactables are normal React components that you build and then wrap with Tambo's `withTamboInteractable` to give Tambo access to them.
@@ -36,6 +44,28 @@ When you wrap a component with `withTamboInteractable`, Tambo creates an automat
 **Automatic Tool Registration**: Update tools are automatically registered to allow Tambo to update the component's props when needed.
 
 Place these wherever you normally would within the application to enable a traditional, statically-organized, user interface enhanced with AI capabilities.
+
+## Automatic Interactables
+
+If you want all AI-generated components to be automatically interactable without manually wrapping them, enable the `autoInteractables` prop on `TamboProvider`:
+
+```tsx
+<TamboProvider
+  apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
+  components={[WeatherCard, StockChart, Note]}
+  autoInteractables={true}
+>
+  <ChatInterface />
+</TamboProvider>
+```
+
+With `autoInteractables` enabled:
+- Any component Tambo generates in response to user messages automatically becomes interactable
+- Users can ask Tambo to modify these generated components through conversation
+- No need to manually wrap components or place them in specific locations
+- Perfect for chat-style interfaces where the component list is dynamic
+
+This mode is ideal when you want a fully conversational UI where users can say things like "update that weather card to show Seattle" or "change the note's title" and have Tambo automatically know which components they're referring to.
 
 <LearnMore
   title="How to register Interactable components"
