@@ -388,6 +388,10 @@ Track streaming status for components rendered via `ComponentRenderer`. Provides
 
 **Important**: Props update repeatedly during streaming and may be partial. Use `propStatus.<field>?.isSuccess` before treating a prop as complete.
 
+**Supports nested objects and arrays:**
+- For nested objects, access nested status via `propStatus.parent?.child?.isStreaming`
+- For arrays, access `propStatus.items?.completedItems` and `propStatus.items?.streamingItems`
+
 ```tsx
 import { useTamboStreamStatus } from "@tambo-ai/react";
 
@@ -403,6 +407,56 @@ function MyComponent(props: MyProps) {
       </h2>
       {streamStatus.isSuccess && <p>Stream complete</p>}
     </div>
+  );
+}
+```
+
+### Nested Object Example
+
+```tsx
+interface UserProps {
+  user: {
+    name: string;
+    email: string;
+  };
+}
+
+function UserCard({ user }: UserProps) {
+  const { propStatus } = useTamboStreamStatus<UserProps>();
+
+  return (
+    <div>
+      <h3 className={propStatus.user?.name?.isStreaming ? "animate-pulse" : ""}>
+        {user.name}
+      </h3>
+      <p className={propStatus.user?.email?.isStreaming ? "animate-pulse" : ""}>
+        {user.email}
+      </p>
+    </div>
+  );
+}
+```
+
+### Array Example
+
+```tsx
+interface ListProps {
+  items: string[];
+}
+
+function StreamingList({ items }: ListProps) {
+  const { propStatus } = useTamboStreamStatus<ListProps>();
+
+  // Show only completed items, hide items still streaming
+  const completedItems = propStatus.items?.completedItems || [];
+
+  return (
+    <ul>
+      {completedItems.map((item, index) => (
+        <li key={index}>{item}</li>
+      ))}
+      {propStatus.items?.isStreaming && <li>Loading more...</li>}
+    </ul>
   );
 }
 ```
