@@ -99,7 +99,7 @@ In general, try to fit changes into the following categories. If you can't find 
    - integrate - Adding Tambo to existing projects
    - components - Understanding registration patterns
 
-2. **Concepts** (11 pages across subsections)
+2. **Concepts** (12 pages across subsections)
    - **generative-interfaces/** (4 pages including index)
      - generative-components
      - interactable-components
@@ -111,6 +111,8 @@ In general, try to fit changes into the following categories. If you can't find 
    - tools - Function calling, schemas, orchestration
    - additional-context - Configuration, custom helpers, context attachments
    - conversation-storage - Message threads, history management, status tracking
+   - **streaming/** (2 pages including index)
+     - component-streaming-status - Track prop, nested object, and array streaming status
    - memory - Cross-conversation memory extraction, injection, and management
    - skills - Reusable instruction sets that run in the provider's sandbox
    - agent-configuration - AI personality and behavior

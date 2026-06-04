@@ -5,6 +5,7 @@
     "tools",
     "additional-context",
     "conversation-storage",
+    "streaming",
     "memory",
     "skills",
     "agent-configuration",

@@ -1,0 +1,62 @@
+---
+title: Streaming Status Tracking
+description: Monitor and respond to streaming state changes in real-time as Tambo generates components and content
+---
+
+Tambo streams AI responses in real-time, allowing your UI to respond progressively as content arrives. The React SDK provides hooks to track streaming status at both the global level (entire component) and the granular level (individual props, nested objects, and array items).
+
+## Why Track Streaming Status
+
+Tracking streaming status enables better user experiences:
+
+- Show loading states for specific fields while others display
+- Highlight props that are currently being generated
+- Display partial arrays as items complete
+- Provide visual feedback during long generations
+- Handle nested object properties independently
+
+## Streaming Status Levels
+
+### Global Stream Status
+
+The `streamStatus` object tracks the overall state of component streaming:
+
+```tsx
+import { useTamboStreamStatus } from "@tambo-ai/react";
+
+function MyComponent(props) {
+  const { streamStatus } = useTamboStreamStatus();
+
+  if (streamStatus.isPending) return <Skeleton />;
+  if (streamStatus.isStreaming) return <ProgressIndicator />;
+  if (streamStatus.isError) return <ErrorDisplay error={streamStatus.streamError} />;
+  if (streamStatus.isSuccess) return <FullContent {...props} />;
+}
+```
+
+### Prop-Level Status
+
+The `propStatus` object tracks individual prop streaming:
+
+```tsx
+const { propStatus } = useTamboStreamStatus<Props>();
+
+<div>
+  <h2 className={propStatus.title?.isStreaming ? "animate-pulse" : ""}>
+    {title}
+  </h2>
+  <p>{description}</p>
+</div>
+```
+
+## Core Concepts
+
+import LearnMore from "@/components/learn-more";
+import { Activity } from "lucide-react";
+
+<LearnMore
+  title="Component Streaming Status"
+  description="Detailed guide on tracking streaming status for props, nested objects, and arrays"
+  href="/concepts/streaming/component-streaming-status"
+  icon={Activity}
+/>

@@ -384,7 +384,7 @@ function EditableCard({ title: initialTitle }: { title: string }) {
 
 ## useTamboStreamStatus
 
-Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity.
+Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity with support for nested objects and arrays.
 
 **Important**: Props update repeatedly during streaming and may be partial. Use `propStatus.<field>?.isSuccess` before treating a prop as complete.
 
@@ -402,6 +402,66 @@ function MyComponent(props: MyProps) {
         {props.title}
       </h2>
       {streamStatus.isSuccess && <p>Stream complete</p>}
+    </div>
+  );
+}
+```
+
+### Nested Object Tracking
+
+Track streaming status for nested properties:
+
+```tsx
+interface UserCardProps {
+  user: {
+    name: string;
+    profile: {
+      bio: string;
+    };
+  };
+}
+
+function UserCard({ user }: UserCardProps) {
+  const { propStatus } = useTamboStreamStatus<UserCardProps>();
+  
+  // Access nested status
+  const userStatus = propStatus.user as PropStatus;
+  const profileStatus = userStatus.profile as PropStatus;
+  
+  return (
+    <div>
+      <h2 className={userStatus.name?.isStreaming ? "animate-pulse" : ""}>
+        {user.name}
+      </h2>
+      <p>{user.profile.bio}</p>
+    </div>
+  );
+}
+```
+
+### Array Tracking
+
+For array props, access `completedItems` and `streamingItems`:
+
+```tsx
+interface RecipeListProps {
+  recipes: Array<{ name: string; ingredients: string[] }>;
+}
+
+function RecipeList({ recipes }: RecipeListProps) {
+  const { propStatus } = useTamboStreamStatus<RecipeListProps>();
+  
+  const completed = propStatus.recipes?.completedItems ?? [];
+  const streaming = propStatus.recipes?.streamingItems ?? [];
+  
+  return (
+    <div>
+      {completed.map((recipe, i) => (
+        <RecipeCard key={i} recipe={recipe} />
+      ))}
+      {streaming.map((recipe, i) => (
+        <RecipeCard key={`s-${i}`} recipe={recipe} isStreaming />
+      ))}
     </div>
   );
 }
