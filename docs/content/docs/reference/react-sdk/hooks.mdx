@@ -384,7 +384,7 @@ function EditableCard({ title: initialTitle }: { title: string }) {
 
 ## useTamboStreamStatus
 
-Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity.
+Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity, with support for nested objects and arrays.
 
 **Important**: Props update repeatedly during streaming and may be partial. Use `propStatus.<field>?.isSuccess` before treating a prop as complete.
 
@@ -412,12 +412,100 @@ function MyComponent(props: MyProps) {
 | Value          | Type                                                      | Description                                                                                                                                    |
 | -------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | `streamStatus` | [`StreamStatus`](/reference/react-sdk/types#streamstatus) | Overall streaming status for the component                                                                                                     |
-| `propStatus`   | `Partial<Record<keyof Props, PropStatus>>`                | Per-prop streaming status. Keys are absent until the prop receives its first token. See [`PropStatus`](/reference/react-sdk/types#propstatus). |
+| `propStatus`   | `Partial<Record<keyof Props, NestedPropStatus>>`          | Per-prop streaming status with nested object and array support. Keys are absent until the prop receives its first token. See [`PropStatus`](/reference/react-sdk/types#propstatus). |
 
 <Callout type="info">
   This hook only works inside components rendered via `ComponentRenderer`. The
   renderer provides the necessary context for tracking streaming state.
 </Callout>
+
+### Nested Object Support
+
+For props with nested objects, `propStatus` recursively tracks the streaming status of each nested property. Access nested status using dot notation:
+
+```tsx
+interface UserCardProps {
+  user: {
+    name: string;
+    email: string;
+    profile: {
+      bio: string;
+    };
+  };
+}
+
+function UserCard(props: UserCardProps) {
+  const { propStatus } = useTamboStreamStatus<UserCardProps>();
+
+  // Check if entire user object is streaming
+  if (propStatus.user?.isStreaming) {
+    return <Skeleton />;
+  }
+
+  // Show skeleton for individual fields that are still streaming
+  return (
+    <div>
+      {propStatus.user?.name?.isStreaming ? (
+        <Skeleton className="h-6 w-32" />
+      ) : (
+        <h2>{props.user.name}</h2>
+      )}
+
+      {propStatus.user?.profile?.bio?.isStreaming ? (
+        <Skeleton className="h-20 w-full" />
+      ) : (
+        <p>{props.user.profile.bio}</p>
+      )}
+    </div>
+  );
+}
+```
+
+Each nested property has its own `PropStatus` with `isPending`, `isStreaming`, `isSuccess`, and `error` fields.
+
+### Array Support
+
+For array props, `propStatus` includes `completedItems` and `streamingItems` arrays that let you render completed items while the rest stream:
+
+```tsx
+interface ItemListProps {
+  items: Array<{
+    id: string;
+    title: string;
+    description: string;
+  }>;
+}
+
+function ItemList(props: ItemListProps) {
+  const { propStatus } = useTamboStreamStatus<ItemListProps>();
+
+  // Show completed items immediately
+  const completed = propStatus.items?.completedItems || [];
+  const streaming = propStatus.items?.streamingItems || [];
+
+  return (
+    <div>
+      {completed.map((item) => (
+        <ItemCard key={item.id} {...item} />
+      ))}
+
+      {streaming.map((item) => (
+        <div key={item.id} className="opacity-50">
+          <ItemCard {...item} />
+          <span className="text-sm text-gray-500">Streaming...</span>
+        </div>
+      ))}
+
+      {propStatus.items?.isPending && <Skeleton />}
+    </div>
+  );
+}
+```
+
+Array status includes:
+- `completedItems`: Array items that have finished streaming
+- `streamingItems`: Array items currently streaming
+- Standard status fields (`isPending`, `isStreaming`, `isSuccess`, `error`)
 
 ## useTamboSuggestions
 

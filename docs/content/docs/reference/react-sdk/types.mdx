@@ -627,10 +627,14 @@ interface StreamStatus {
 
 ### PropStatus
 
-Per-prop streaming status, returned by `useTamboStreamStatus()`.
+Per-prop streaming status, returned by `useTamboStreamStatus()`. Supports nested objects and arrays.
+
+#### BasePropStatus
+
+Base streaming status fields shared by all prop types:
 
 ```typescript
-interface PropStatus {
+interface BasePropStatus {
   isPending: boolean;
   isStreaming: boolean;
   isSuccess: boolean;
@@ -644,6 +648,40 @@ interface PropStatus {
 | `isStreaming` | `boolean` | Tokens received but streaming is not complete      |
 | `isSuccess`   | `boolean` | This prop has finished streaming successfully      |
 | `error`       | `Error`   | Error that occurred during streaming for this prop |
+
+#### ArrayPropStatus
+
+Extended status for array props, includes tracking of completed and streaming items:
+
+```typescript
+interface ArrayPropStatus<T = unknown> extends BasePropStatus {
+  completedItems?: T[];
+  streamingItems?: T[];
+}
+```
+
+| Property         | Type  | Description                               |
+| ---------------- | ----- | ----------------------------------------- |
+| `completedItems` | `T[]` | Array items that have finished streaming  |
+| `streamingItems` | `T[]` | Array items that are currently streaming  |
+
+#### NestedPropStatus
+
+Recursive type for tracking nested object properties and arrays:
+
+```typescript
+type NestedPropStatus<T> = T extends Array<infer U>
+  ? ArrayPropStatus<U>
+  : T extends object
+    ? BasePropStatus & {
+        [K in keyof T]?: NestedPropStatus<T[K]>;
+      }
+    : BasePropStatus;
+```
+
+For nested objects, `NestedPropStatus` includes both the base status fields for the object itself and nested status for each property. Access nested properties using dot notation: `propStatus.user?.name?.isStreaming`.
+
+For arrays, `NestedPropStatus` resolves to `ArrayPropStatus<T>` with `completedItems` and `streamingItems` fields.
 
 ## Tool Annotations
 
