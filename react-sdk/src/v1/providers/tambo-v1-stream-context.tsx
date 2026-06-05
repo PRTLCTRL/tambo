@@ -19,6 +19,8 @@ import React, {
 } from "react";
 import { useTamboQuery } from "../../hooks/react-query-hooks";
 import { useTamboClient } from "../../providers/tambo-client-provider";
+import { useTamboInteractable } from "../../providers/tambo-interactable-provider";
+import { useTamboRegistry } from "../../providers/tambo-registry-provider";
 import type { InitialInputMessage, TamboThreadMessage } from "../types/message";
 import type { TamboThread } from "@tambo-ai/client";
 import {
@@ -232,6 +234,7 @@ export function TamboStreamProvider(props: TamboStreamProviderProps) {
       <StreamDispatchContext.Provider value={activeDispatch}>
         <ThreadManagementContext.Provider value={threadManagement}>
           <ThreadSyncManager />
+          <AutoInteractablesManager />
           {children}
         </ThreadManagementContext.Provider>
       </StreamDispatchContext.Provider>
@@ -306,6 +309,88 @@ function ThreadSyncManager(): null {
 
     lastSyncedThreadRef.current = currentThreadId;
   }, [messagesSuccess, messagesData, currentThreadId, dispatch]);
+
+  return null;
+}
+
+/**
+ * Internal component that automatically adds components to interactables
+ * when autoInteractables is enabled.
+ * Must be used within StreamStateContext, TamboInteractableContext, and TamboConfigContext.
+ * @internal
+ * @returns null - this component renders nothing
+ */
+function AutoInteractablesManager(): null {
+  const state = useContext(StreamStateContext);
+  const { autoInteractables } = useTamboConfig();
+  const { addInteractableComponent } = useTamboInteractable();
+  const { componentList } = useTamboRegistry();
+
+  // Track which components we've already added to avoid duplicates
+  const processedComponentsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!autoInteractables || !state) return;
+
+    const currentThreadId = state.currentThreadId;
+    const threadState = state.threadMap[currentThreadId];
+    if (!threadState) return;
+
+    const messages = threadState.thread.messages;
+
+    for (const message of messages) {
+      if (message.role !== "assistant") continue;
+
+      for (const content of message.content) {
+        if (content.type !== "component") continue;
+
+        // Check if we've already processed this component instance
+        const componentKey = `${message.id}:${content.id}`;
+        if (processedComponentsRef.current.has(componentKey)) continue;
+
+        // Check if component is registered (componentList is Record<string, RegisteredComponent>)
+        const registeredComponent = componentList[content.name];
+        if (!registeredComponent) {
+          console.warn(
+            `[AutoInteractables] Cannot add component ${content.name} - not found in registry`,
+          );
+          processedComponentsRef.current.add(componentKey);
+          continue;
+        }
+
+        // Check if streaming is complete
+        if (content.streamingState && content.streamingState !== "done") {
+          continue;
+        }
+
+        try {
+          // Add to interactables - handle unknown props type
+          const propsValue =
+            content.props &&
+            typeof content.props === "object" &&
+            !Array.isArray(content.props)
+              ? (content.props as Record<string, unknown>)
+              : (Object.create(null) as Record<string, unknown>);
+
+          addInteractableComponent({
+            name: content.name,
+            component: registeredComponent.component,
+            description: registeredComponent.description,
+            props: propsValue,
+            propsSchema: registeredComponent.props,
+          });
+
+          processedComponentsRef.current.add(componentKey);
+        } catch (error) {
+          console.error(
+            `[AutoInteractables] Failed to add component ${content.name}:`,
+            error,
+          );
+          processedComponentsRef.current.add(componentKey);
+        }
+      }
+    }
+  }, [autoInteractables, state, addInteractableComponent, componentList]);
 
   return null;
 }
