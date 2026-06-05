@@ -63,6 +63,12 @@ export interface TamboConfig {
    * These are displayed in the UI immediately and sent to the API on first message.
    */
   initialMessages?: InitialInputMessage[];
+  /**
+   * Whether to automatically add generated components to the interactables registry.
+   * When enabled, all components rendered by the AI are automatically tracked as interactables,
+   * allowing the AI to update them in subsequent messages. Defaults to false.
+   */
+  autoAddToInteractables?: boolean;
 }
 
 /**
@@ -173,6 +179,13 @@ export interface TamboProviderProps extends Pick<
   initialMessages?: InitialInputMessage[];
 
   /**
+   * Whether to automatically add generated components to the interactables registry.
+   * When enabled, all components rendered by the AI are automatically tracked as interactables,
+   * allowing the AI to update them in subsequent messages. Defaults to false.
+   */
+  autoAddToInteractables?: boolean;
+
+  /**
    * Children components
    */
   children: React.ReactNode;
@@ -238,6 +251,7 @@ function TamboAuthWarnings(): null {
  * @param props.autoGenerateThreadName - Whether to automatically generate thread names. Defaults to true.
  * @param props.autoGenerateNameThreshold - The message count threshold at which the thread name will be auto-generated. Defaults to 3.
  * @param props.initialMessages - Optional initial messages to prepend to the first thread.
+ * @param props.autoAddToInteractables - Whether to automatically add generated components to interactables. Defaults to false.
  * @param props.children - Child components
  * @returns Provider component tree
  * @example
@@ -274,6 +288,7 @@ export function TamboProvider({
   autoGenerateThreadName,
   autoGenerateNameThreshold,
   initialMessages,
+  autoAddToInteractables,
   children,
 }: PropsWithChildren<TamboProviderProps>) {
   // Config is static - created once and never changes
@@ -282,6 +297,7 @@ export function TamboProvider({
     autoGenerateThreadName,
     autoGenerateNameThreshold,
     initialMessages,
+    autoAddToInteractables,
   };
 
   return (

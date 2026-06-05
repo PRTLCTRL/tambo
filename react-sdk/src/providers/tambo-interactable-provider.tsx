@@ -23,6 +23,7 @@ import { makeJsonSchemaPartial, schemaToJsonSchema } from "../schema";
 import { assertValidName } from "../util/validate-component-name";
 import { useTamboRegistry } from "./tambo-registry-provider";
 import { useTamboContextHelpers } from "./tambo-context-helpers-provider";
+import { getComponentFromRegistry } from "../util/registry";
 
 const TamboInteractableContext = createContext<TamboInteractableContext>({
   interactableComponents: [],
@@ -562,6 +563,7 @@ export const TamboInteractableProvider: React.FC<PropsWithChildren> = ({
 
   return (
     <TamboInteractableContext.Provider value={value}>
+      <AutoAddWatcher />
       {children}
     </TamboInteractableContext.Provider>
   );
@@ -592,3 +594,147 @@ export const useCurrentInteractablesSnapshot = () => {
 
   return copy;
 };
+
+/**
+ * Hook to access the auto-add setting from TamboConfig.
+ * Returns null if accessed outside of v1 provider context.
+ * @internal
+ * @returns Whether auto-add to interactables is enabled, or null if outside v1 context
+ */
+export const useAutoAddToInteractablesSetting = (): boolean | null => {
+  try {
+    // Dynamic import to avoid circular dependency
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { useTamboConfig } = require("../v1/providers/tambo-v1-provider");
+    const config = useTamboConfig();
+    return config.autoAddToInteractables ?? false;
+  } catch {
+    // Not in v1 provider context
+    return null;
+  }
+};
+
+/**
+ * Hook to access stream state if available.
+ * Returns null if not in stream context.
+ * @internal
+ * @returns Stream state or null
+ */
+const useStreamStateOptional = (): any => {
+  try {
+    // Dynamic import to avoid circular dependency
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { useStreamState } = require("../v1/providers/tambo-v1-stream-context");
+    return useStreamState();
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Internal component that watches for new components in messages and automatically
+ * adds them to interactables when autoAddToInteractables is enabled.
+ * @internal
+ * @returns null - renders nothing
+ */
+function AutoAddWatcher(): null {
+  const autoAddEnabled = useAutoAddToInteractablesSetting();
+  const streamState = useStreamStateOptional();
+  const { addInteractableComponent, getInteractableComponentsByName } =
+    useTamboInteractable();
+  const { componentList } = useTamboRegistry();
+  const seenComponentsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    // Only proceed if auto-add is enabled and we have stream state
+    if (!autoAddEnabled || !streamState) {
+      return;
+    }
+
+    const currentThreadId = streamState.currentThreadId;
+    const threadState = streamState.threadMap[currentThreadId];
+
+    if (!threadState) {
+      return;
+    }
+
+    const messages = threadState.thread.messages;
+
+    // Find all component content blocks in all messages
+    for (const message of messages) {
+      if (message.role !== "assistant") {
+        continue;
+      }
+
+      for (const content of message.content) {
+        if (content.type !== "component") {
+          continue;
+        }
+
+        // Create a unique key for this component instance
+        const componentKey = `${content.id}`;
+
+        // Skip if we've already processed this component
+        if (seenComponentsRef.current.has(componentKey)) {
+          continue;
+        }
+
+        // Mark as seen
+        seenComponentsRef.current.add(componentKey);
+
+        // Check if this component is already registered as interactable
+        // We check by name because the id will be different
+        const existingInteractables = getInteractableComponentsByName(
+          content.name,
+        );
+
+        // Skip if there's already an interactable with matching props
+        const hasMatchingInteractable = existingInteractables.some((existing) =>
+          deepEqual(existing.props, content.props),
+        );
+
+        if (hasMatchingInteractable) {
+          continue;
+        }
+
+        // Get the component from registry
+        let registeredComponent;
+        try {
+          registeredComponent = getComponentFromRegistry(
+            content.name,
+            componentList,
+          );
+        } catch {
+          // Component not in registry - skip
+          continue;
+        }
+
+        // Add to interactables
+        try {
+          addInteractableComponent({
+            name: content.name,
+            description: registeredComponent.description,
+            component: registeredComponent.component,
+            propsSchema: registeredComponent.props,
+            props: content.props ?? {},
+            state: {},
+            annotations: registeredComponent.annotations,
+          });
+        } catch (error) {
+          console.error(
+            `[AutoAddWatcher] Failed to add component ${content.name} to interactables:`,
+            error,
+          );
+        }
+      }
+    }
+  }, [
+    autoAddEnabled,
+    streamState,
+    addInteractableComponent,
+    getInteractableComponentsByName,
+    componentList,
+  ]);
+
+  return null;
+}
