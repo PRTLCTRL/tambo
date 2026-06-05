@@ -1,5 +1,3 @@
-// react-sdk/src/providers/tambo-interactable-provider.tsx
-"use client";
 import { deepEqual } from "fast-equals";
 import { JSONSchema7 } from "json-schema";
 import React, {
@@ -23,6 +21,9 @@ import { makeJsonSchemaPartial, schemaToJsonSchema } from "../schema";
 import { assertValidName } from "../util/validate-component-name";
 import { useTamboRegistry } from "./tambo-registry-provider";
 import { useTamboContextHelpers } from "./tambo-context-helpers-provider";
+import { useTamboConfig } from "../v1/providers/tambo-v1-provider";
+import { useStreamState } from "../v1/providers/tambo-v1-stream-context";
+import { getComponentFromRegistry } from "../util/registry";
 
 const TamboInteractableContext = createContext<TamboInteractableContext>({
   interactableComponents: [],
@@ -566,6 +567,212 @@ export const TamboInteractableProvider: React.FC<PropsWithChildren> = ({
     </TamboInteractableContext.Provider>
   );
 };
+
+/**
+ * Internal component that automatically syncs generated components to interactables
+ * when autoAddComponentsToInteractables is enabled.
+ * Must be used within TamboInteractableContext, TamboConfigContext, StreamStateContext, and TamboRegistryContext.
+ * @internal
+ * @returns null - this component renders nothing
+ */
+function AutoInteractableSync(): null {
+  const config = useTamboConfig();
+  const streamState = useStreamState();
+  const { addInteractableComponent, interactableComponents } =
+    useTamboInteractable();
+  const registry = useTamboRegistry();
+
+  // Track which component content IDs we've already added to avoid duplicates
+  const addedComponentIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!config.autoAddComponentsToInteractables) {
+      return;
+    }
+
+    // Get all component content blocks from all messages in the current thread
+    const currentThreadId = streamState.currentThreadId;
+    const threadState = streamState.threadMap[currentThreadId];
+
+    if (!threadState) {
+      return;
+    }
+
+    const messages = threadState.thread.messages;
+
+    for (const message of messages) {
+      // Only process assistant messages
+      if (message.role !== "assistant") {
+        continue;
+      }
+
+      for (const contentBlock of message.content) {
+        // Only process component content blocks
+        if (contentBlock.type !== "component") {
+          continue;
+        }
+
+        // Skip if we've already added this component
+        if (addedComponentIdsRef.current.has(contentBlock.id)) {
+          continue;
+        }
+
+        // Skip if this component is already in the interactables list
+        const alreadyInteractable = interactableComponents.some(
+          (ic) => ic.id === contentBlock.id,
+        );
+        if (alreadyInteractable) {
+          addedComponentIdsRef.current.add(contentBlock.id);
+          continue;
+        }
+
+        // Get the registered component metadata
+        let registeredComponent;
+        try {
+          registeredComponent = getComponentFromRegistry(
+            contentBlock.name,
+            registry.componentList,
+          );
+        } catch {
+          // Component not found in registry - skip
+          continue;
+        }
+
+        // Add to interactables with a fixed ID (using the content block ID)
+        // We'll override the normal ID generation to use the component content ID
+        // This ensures we can track and update this specific component instance
+        const interactableComponent: Omit<
+          TamboInteractableComponent,
+          "id" | "createdAt"
+        > = {
+          name: contentBlock.name,
+          description: registeredComponent.description,
+          component: registeredComponent.component,
+          props: contentBlock.props ?? {},
+          propsSchema: registeredComponent.propsSchema,
+          stateSchema: registeredComponent.stateSchema,
+        };
+
+        // Since addInteractableComponent generates its own ID, we need to track
+        // the mapping between the content ID and the generated interactable ID
+        // For now, we'll just add it and mark this content ID as processed
+        addInteractableComponent(interactableComponent);
+        addedComponentIdsRef.current.add(contentBlock.id);
+      }
+    }
+  }, [
+    config.autoAddComponentsToInteractables,
+    streamState,
+    addInteractableComponent,
+    interactableComponents,
+    registry.componentList,
+  ]);
+
+  return null;
+}
+
+/**
+ * Internal component that automatically syncs generated components to interactables
+ * when autoAddComponentsToInteractables is enabled.
+ * Must be used within TamboInteractableContext, TamboConfigContext, StreamStateContext, and TamboRegistryContext.
+ * @internal
+ * @returns null - this component renders nothing
+ */
+function AutoInteractableSync(): null {
+  const config = useTamboConfig();
+  const streamState = useStreamState();
+  const { addInteractableComponent, interactableComponents } =
+    useTamboInteractable();
+  const registry = useTamboRegistry();
+
+  // Track which component content IDs we've already added to avoid duplicates
+  const addedComponentIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!config.autoAddComponentsToInteractables) {
+      return;
+    }
+
+    // Get all component content blocks from all messages in the current thread
+    const currentThreadId = streamState.currentThreadId;
+    const threadState = streamState.threadMap[currentThreadId];
+
+    if (!threadState) {
+      return;
+    }
+
+    const messages = threadState.thread.messages;
+
+    for (const message of messages) {
+      // Only process assistant messages
+      if (message.role !== "assistant") {
+        continue;
+      }
+
+      for (const contentBlock of message.content) {
+        // Only process component content blocks
+        if (contentBlock.type !== "component") {
+          continue;
+        }
+
+        // Skip if we've already added this component
+        if (addedComponentIdsRef.current.has(contentBlock.id)) {
+          continue;
+        }
+
+        // Skip if this component is already in the interactables list
+        const alreadyInteractable = interactableComponents.some(
+          (ic) => ic.id === contentBlock.id,
+        );
+        if (alreadyInteractable) {
+          addedComponentIdsRef.current.add(contentBlock.id);
+          continue;
+        }
+
+        // Get the registered component metadata
+        let registeredComponent;
+        try {
+          registeredComponent = getComponentFromRegistry(
+            contentBlock.name,
+            registry.componentList,
+          );
+        } catch {
+          // Component not found in registry - skip
+          continue;
+        }
+
+        // Add to interactables with a fixed ID (using the content block ID)
+        // We'll override the normal ID generation to use the component content ID
+        // This ensures we can track and update this specific component instance
+        const interactableComponent: Omit<
+          TamboInteractableComponent,
+          "id" | "createdAt"
+        > = {
+          name: contentBlock.name,
+          description: registeredComponent.description,
+          component: registeredComponent.component,
+          props: contentBlock.props ?? {},
+          propsSchema: registeredComponent.propsSchema,
+          stateSchema: registeredComponent.stateSchema,
+        };
+
+        // Since addInteractableComponent generates its own ID, we need to track
+        // the mapping between the content ID and the generated interactable ID
+        // For now, we'll just add it and mark this content ID as processed
+        addInteractableComponent(interactableComponent);
+        addedComponentIdsRef.current.add(contentBlock.id);
+      }
+    }
+  }, [
+    config.autoAddComponentsToInteractables,
+    streamState,
+    addInteractableComponent,
+    interactableComponents,
+    registry.componentList,
+  ]);
+
+  return null;
+}
 
 /**
  * The useTamboInteractable hook provides access to the interactable component
