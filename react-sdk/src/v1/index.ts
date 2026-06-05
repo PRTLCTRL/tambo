@@ -141,6 +141,9 @@ export {
   useTamboStreamStatus,
   type StreamStatus,
   type PropStatus,
+  type BasePropStatus,
+  type ArrayPropStatus,
+  type NestedPropStatus,
 } from "./hooks/use-tambo-v1-stream-status";
 
 export {
