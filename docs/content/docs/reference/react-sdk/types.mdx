@@ -627,16 +627,29 @@ interface StreamStatus {
 
 ### PropStatus
 
-Per-prop streaming status, returned by `useTamboStreamStatus()`.
+Per-prop streaming status, returned by `useTamboStreamStatus()`. Supports flat values, nested objects, and arrays.
 
 ```typescript
-interface PropStatus {
+type PropStatus = BasePropStatus | ArrayPropStatus | NestedPropStatus;
+
+interface BasePropStatus {
   isPending: boolean;
   isStreaming: boolean;
   isSuccess: boolean;
   error?: Error;
 }
+
+interface ArrayPropStatus extends BasePropStatus {
+  completedItems: unknown[];
+  streamingItems: unknown[];
+}
+
+type NestedPropStatus = BasePropStatus & {
+  [key: string]: PropStatus;
+};
 ```
+
+**Base Properties** (present for all prop types):
 
 | Property      | Type      | Description                                        |
 | ------------- | --------- | -------------------------------------------------- |
@@ -644,6 +657,17 @@ interface PropStatus {
 | `isStreaming` | `boolean` | Tokens received but streaming is not complete      |
 | `isSuccess`   | `boolean` | This prop has finished streaming successfully      |
 | `error`       | `Error`   | Error that occurred during streaming for this prop |
+
+**Array-Specific Properties** (when prop value is an array):
+
+| Property          | Type        | Description                                      |
+| ----------------- | ----------- | ------------------------------------------------ |
+| `completedItems`  | `unknown[]` | Items that have finished streaming               |
+| `streamingItems`  | `unknown[]` | Items currently being streamed                   |
+
+**Nested Object Properties** (when prop value is an object):
+
+For nested objects, the `PropStatus` recursively contains status for each nested property, allowing access like `propStatus.user?.name?.isStreaming`.
 
 ## Tool Annotations
 
