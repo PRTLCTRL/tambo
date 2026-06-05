@@ -12,6 +12,7 @@ import type TamboAI from "@tambo-ai/typescript-sdk";
 import React, {
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   type ReactElement,
@@ -42,6 +43,7 @@ import type {
 } from "../types/message";
 import type { StreamingState } from "@tambo-ai/client";
 import { isPlaceholderThreadId, type ThreadState } from "@tambo-ai/client";
+import { useTamboInteractable } from "../../providers/tambo-interactable-provider";
 
 /**
  * Return type for useTambo hook
@@ -208,16 +210,21 @@ interface ComponentCacheEntry {
 export function useTambo(): UseTamboReturn {
   const client = useTamboClient();
   const queryClient = useTamboQueryClient();
-  const { userKey } = useTamboConfig();
+  const { userKey, autoAddComponentsToInteractables } = useTamboConfig();
   const streamState = useStreamState();
   const dispatch = useStreamDispatch();
   const registry = useContext(TamboRegistryContext);
   const threadManagement = useThreadManagement();
   const authState = useTamboAuthState();
+  const { addInteractableComponent, getInteractableComponent } =
+    useTamboInteractable();
 
   // Cache for rendered component wrappers - maintains stable element references
   // across renders when props haven't changed
   const componentCacheRef = useRef(new Map<string, ComponentCacheEntry>());
+
+  // Track which component IDs have been added to interactables to avoid duplicates
+  const addedInteractableIdsRef = useRef(new Set<string>());
 
   // Get thread state for the current thread
   const threadState = streamState.threadMap[streamState.currentThreadId];
@@ -295,6 +302,54 @@ export function useTambo(): UseTamboReturn {
     },
     [client, userKey, dispatch, queryClient],
   );
+
+  // Automatically add components to interactables when enabled
+  useEffect(() => {
+    if (!autoAddComponentsToInteractables) {
+      return;
+    }
+
+    const rawMessages = threadState?.thread.messages ?? [];
+
+    for (const message of rawMessages) {
+      for (const content of message.content) {
+        if (content.type === "component") {
+          const componentContent = content;
+          const componentId = componentContent.id;
+
+          if (
+            addedInteractableIdsRef.current.has(componentId) ||
+            getInteractableComponent(componentId)
+          ) {
+            continue;
+          }
+
+          const componentMetadata = registry.componentList.get(
+            componentContent.name,
+          );
+          if (!componentMetadata) {
+            continue;
+          }
+
+          addInteractableComponent({
+            name: componentContent.name,
+            props: componentContent.props ?? {},
+            propsSchema: componentMetadata.propsSchema,
+            description: componentMetadata.description,
+            annotations: componentMetadata.annotations,
+          });
+
+          addedInteractableIdsRef.current.add(componentId);
+        }
+      }
+    }
+  }, [
+    autoAddComponentsToInteractables,
+    threadState,
+    registry.componentList,
+    addInteractableComponent,
+    getInteractableComponent,
+  ]);
 
   // Memoize the return object to prevent unnecessary re-renders
   return useMemo(() => {

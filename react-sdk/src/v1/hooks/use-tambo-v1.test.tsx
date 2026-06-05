@@ -28,7 +28,10 @@ jest.mock("../providers/tambo-v1-provider", () => {
   const actual = jest.requireActual("../providers/tambo-v1-provider");
   return {
     ...actual,
-    useTamboConfig: () => ({ userKey: undefined }),
+    useTamboConfig: () => ({
+      userKey: undefined,
+      autoAddComponentsToInteractables: false,
+    }),
   };
 });
 
@@ -37,6 +40,22 @@ jest.mock("./use-tambo-v1-auth-state", () => ({
     status: "identified",
     source: "userKey",
   }),
+}));
+
+jest.mock("../../providers/tambo-interactable-provider", () => ({
+  useTamboInteractable: jest.fn(() => ({
+    addInteractableComponent: jest.fn(),
+    getInteractableComponent: jest.fn(() => undefined),
+    removeInteractableComponent: jest.fn(),
+    updateInteractableComponentProps: jest.fn(),
+    getInteractableComponentsByName: jest.fn(() => []),
+    clearAllInteractableComponents: jest.fn(),
+    setInteractableState: jest.fn(),
+    getInteractableComponentState: jest.fn(),
+    setInteractableSelected: jest.fn(),
+    clearInteractableSelections: jest.fn(),
+    interactableComponents: [],
+  })),
 }));
 
 import { useTamboQueryClient } from "../../providers/tambo-client-provider";
@@ -1346,6 +1365,302 @@ describe("useTambo", () => {
       expect((caughtError as Error).message).toBe("Network error");
       expect(result.current.thread?.thread.name).toBe("Old Name");
       expect(invalidateQueriesSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("autoAddComponentsToInteractables", () => {
+    const mockUseTamboConfig = jest.requireMock("../providers/tambo-v1-provider")
+      .useTamboConfig;
+    const mockUseTamboInteractable = jest.requireMock(
+      "../../providers/tambo-interactable-provider",
+    ).useTamboInteractable;
+
+    const TestComponent = () => <div>Test Component</div>;
+
+    const testComponentMetadata = {
+      name: "TestComponent",
+      description: "A test component",
+      component: TestComponent,
+      propsSchema: { type: "object" as const },
+      annotations: { testAnnotation: true },
+    };
+
+    beforeEach(() => {
+      mockUseTamboConfig.mockReturnValue({
+        userKey: undefined,
+        autoAddComponentsToInteractables: false,
+      });
+    });
+
+    it("does not add components to interactables when feature is disabled", () => {
+      const mockAddInteractable = jest.fn();
+      mockUseTamboInteractable.mockReturnValue({
+        addInteractableComponent: mockAddInteractable,
+        getInteractableComponent: jest.fn(() => undefined),
+        removeInteractableComponent: jest.fn(),
+        updateInteractableComponentProps: jest.fn(),
+        getInteractableComponentsByName: jest.fn(() => []),
+        clearAllInteractableComponents: jest.fn(),
+        setInteractableState: jest.fn(),
+        getInteractableComponentState: jest.fn(),
+        setInteractableSelected: jest.fn(),
+        clearInteractableSelections: jest.fn(),
+        interactableComponents: [],
+      });
+
+      const registry = {
+        ...mockRegistry,
+        componentList: new Map([["TestComponent", testComponentMetadata]]),
+      };
+
+      const initialState: StreamState = {
+        threadMap: {
+          thread_123: {
+            thread: {
+              id: "thread_123",
+              messages: [
+                {
+                  id: "msg_1",
+                  role: "assistant" as const,
+                  content: [
+                    {
+                      type: "component" as const,
+                      id: "comp_1",
+                      name: "TestComponent",
+                      props: { title: "Test" },
+                      streamingState: "complete" as const,
+                    },
+                  ],
+                },
+              ],
+              status: "idle" as const,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              lastRunCancelled: false,
+            },
+            streaming: { status: "idle" as const },
+            accumulatingToolArgs: {},
+          },
+        },
+        currentThreadId: "thread_123",
+      };
+
+      renderHook(() => useTambo(), {
+        wrapper: createWrapperWithState(initialState, registry),
+      });
+
+      expect(mockAddInteractable).not.toHaveBeenCalled();
+    });
+
+    it("adds components to interactables when feature is enabled", () => {
+      mockUseTamboConfig.mockReturnValue({
+        userKey: undefined,
+        autoAddComponentsToInteractables: true,
+      });
+
+      const mockAddInteractable = jest.fn();
+      const mockGetInteractable = jest.fn(() => undefined);
+      mockUseTamboInteractable.mockReturnValue({
+        addInteractableComponent: mockAddInteractable,
+        getInteractableComponent: mockGetInteractable,
+        removeInteractableComponent: jest.fn(),
+        updateInteractableComponentProps: jest.fn(),
+        getInteractableComponentsByName: jest.fn(() => []),
+        clearAllInteractableComponents: jest.fn(),
+        setInteractableState: jest.fn(),
+        getInteractableComponentState: jest.fn(),
+        setInteractableSelected: jest.fn(),
+        clearInteractableSelections: jest.fn(),
+        interactableComponents: [],
+      });
+
+      const registry = {
+        ...mockRegistry,
+        componentList: new Map([["TestComponent", testComponentMetadata]]),
+      };
+
+      const initialState: StreamState = {
+        threadMap: {
+          thread_123: {
+            thread: {
+              id: "thread_123",
+              messages: [
+                {
+                  id: "msg_1",
+                  role: "assistant" as const,
+                  content: [
+                    {
+                      type: "component" as const,
+                      id: "comp_1",
+                      name: "TestComponent",
+                      props: { title: "Test" },
+                      streamingState: "complete" as const,
+                    },
+                  ],
+                },
+              ],
+              status: "idle" as const,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              lastRunCancelled: false,
+            },
+            streaming: { status: "idle" as const },
+            accumulatingToolArgs: {},
+          },
+        },
+        currentThreadId: "thread_123",
+      };
+
+      renderHook(() => useTambo(), {
+        wrapper: createWrapperWithState(initialState, registry),
+      });
+
+      expect(mockAddInteractable).toHaveBeenCalledWith({
+        name: "TestComponent",
+        props: { title: "Test" },
+        propsSchema: testComponentMetadata.propsSchema,
+        description: testComponentMetadata.description,
+        annotations: testComponentMetadata.annotations,
+      });
+    });
+
+    it("does not add duplicate components to interactables", () => {
+      mockUseTamboConfig.mockReturnValue({
+        userKey: undefined,
+        autoAddComponentsToInteractables: true,
+      });
+
+      const mockAddInteractable = jest.fn();
+      const existingComponent = {
+        id: "TestComponent-abc",
+        name: "TestComponent",
+        props: { title: "Test" },
+      };
+      const mockGetInteractable = jest
+        .fn()
+        .mockReturnValue(existingComponent);
+
+      mockUseTamboInteractable.mockReturnValue({
+        addInteractableComponent: mockAddInteractable,
+        getInteractableComponent: mockGetInteractable,
+        removeInteractableComponent: jest.fn(),
+        updateInteractableComponentProps: jest.fn(),
+        getInteractableComponentsByName: jest.fn(() => []),
+        clearAllInteractableComponents: jest.fn(),
+        setInteractableState: jest.fn(),
+        getInteractableComponentState: jest.fn(),
+        setInteractableSelected: jest.fn(),
+        clearInteractableSelections: jest.fn(),
+        interactableComponents: [existingComponent],
+      });
+
+      const registry = {
+        ...mockRegistry,
+        componentList: new Map([["TestComponent", testComponentMetadata]]),
+      };
+
+      const initialState: StreamState = {
+        threadMap: {
+          thread_123: {
+            thread: {
+              id: "thread_123",
+              messages: [
+                {
+                  id: "msg_1",
+                  role: "assistant" as const,
+                  content: [
+                    {
+                      type: "component" as const,
+                      id: "comp_1",
+                      name: "TestComponent",
+                      props: { title: "Test" },
+                      streamingState: "complete" as const,
+                    },
+                  ],
+                },
+              ],
+              status: "idle" as const,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              lastRunCancelled: false,
+            },
+            streaming: { status: "idle" as const },
+            accumulatingToolArgs: {},
+          },
+        },
+        currentThreadId: "thread_123",
+      };
+
+      renderHook(() => useTambo(), {
+        wrapper: createWrapperWithState(initialState, registry),
+      });
+
+      expect(mockAddInteractable).not.toHaveBeenCalled();
+    });
+
+    it("skips components that are not in the registry", () => {
+      mockUseTamboConfig.mockReturnValue({
+        userKey: undefined,
+        autoAddComponentsToInteractables: true,
+      });
+
+      const mockAddInteractable = jest.fn();
+      mockUseTamboInteractable.mockReturnValue({
+        addInteractableComponent: mockAddInteractable,
+        getInteractableComponent: jest.fn(() => undefined),
+        removeInteractableComponent: jest.fn(),
+        updateInteractableComponentProps: jest.fn(),
+        getInteractableComponentsByName: jest.fn(() => []),
+        clearAllInteractableComponents: jest.fn(),
+        setInteractableState: jest.fn(),
+        getInteractableComponentState: jest.fn(),
+        setInteractableSelected: jest.fn(),
+        clearInteractableSelections: jest.fn(),
+        interactableComponents: [],
+      });
+
+      const registry = {
+        ...mockRegistry,
+        componentList: new Map(),
+      };
+
+      const initialState: StreamState = {
+        threadMap: {
+          thread_123: {
+            thread: {
+              id: "thread_123",
+              messages: [
+                {
+                  id: "msg_1",
+                  role: "assistant" as const,
+                  content: [
+                    {
+                      type: "component" as const,
+                      id: "comp_1",
+                      name: "UnknownComponent",
+                      props: { title: "Test" },
+                      streamingState: "complete" as const,
+                    },
+                  ],
+                },
+              ],
+              status: "idle" as const,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              lastRunCancelled: false,
+            },
+            streaming: { status: "idle" as const },
+            accumulatingToolArgs: {},
+          },
+        },
+        currentThreadId: "thread_123",
+      };
+
+      renderHook(() => useTambo(), {
+        wrapper: createWrapperWithState(initialState, registry),
+      });
+
+      expect(mockAddInteractable).not.toHaveBeenCalled();
     });
   });
 });
