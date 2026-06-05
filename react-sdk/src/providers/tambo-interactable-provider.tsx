@@ -23,6 +23,9 @@ import { makeJsonSchemaPartial, schemaToJsonSchema } from "../schema";
 import { assertValidName } from "../util/validate-component-name";
 import { useTamboRegistry } from "./tambo-registry-provider";
 import { useTamboContextHelpers } from "./tambo-context-helpers-provider";
+import { useTamboConfig } from "../v1/providers/tambo-v1-provider";
+import { useStreamState } from "../v1/providers/tambo-v1-stream-context";
+import type { TamboComponentContent } from "../v1/types/message";
 
 const TamboInteractableContext = createContext<TamboInteractableContext>({
   interactableComponents: [],
@@ -56,8 +59,11 @@ export const TamboInteractableProvider: React.FC<PropsWithChildren> = ({
     TamboInteractableComponent[]
   >([]);
   const toolComponentOwnershipRef = useRef<Record<string, string[]>>({});
-  const { registerTool, unregisterTools } = useTamboRegistry();
+  const { registerTool, unregisterTools, componentList } = useTamboRegistry();
   const { addContextHelper, removeContextHelper } = useTamboContextHelpers();
+  const { autoAddInteractables } = useTamboConfig();
+  const streamState = useStreamState();
+  const addedComponentsRef = useRef<Set<string>>(new Set());
 
   const registerToolForComponent = useCallback(
     (componentId: string, tool: TamboTool) => {
@@ -421,13 +427,21 @@ export const TamboInteractableProvider: React.FC<PropsWithChildren> = ({
   const addInteractableComponent = useCallback(
     (
       component: Omit<TamboInteractableComponent, "id" | "createdAt">,
+      customId?: string,
     ): string => {
       // Validate component name
       assertValidName(component.name, "component");
 
-      // Add a random part to the component name to make it unique when using multiple instances of the same component.
-      const tamboGeneratedNamePart = `-${Math.random().toString(36).slice(2, 5)}`;
-      const id = `${component.name}${tamboGeneratedNamePart}`;
+      let id: string;
+      if (customId) {
+        // Use the provided custom ID (for auto-added components)
+        id = customId;
+      } else {
+        // Add a random part to the component name to make it unique when using multiple instances of the same component.
+        const tamboGeneratedNamePart = `-${Math.random().toString(36).slice(2, 5)}`;
+        id = `${component.name}${tamboGeneratedNamePart}`;
+      }
+
       const newComponent: TamboInteractableComponent = {
         ...component,
         id,
@@ -545,6 +559,70 @@ export const TamboInteractableProvider: React.FC<PropsWithChildren> = ({
       return prev.map((c) => (c.isSelected ? { ...c, isSelected: false } : c));
     });
   }, []);
+
+  // Auto-add generated components to interactables when autoAddInteractables is enabled
+  useEffect(() => {
+    if (!autoAddInteractables) return;
+
+    const currentThread = streamState.threadMap[streamState.currentThreadId];
+    if (!currentThread) return;
+
+    for (const message of currentThread.thread.messages) {
+      if (message.role !== "assistant") continue;
+
+      for (const contentBlock of message.content) {
+        if (contentBlock.type !== "component") continue;
+
+        const componentContent = contentBlock as TamboComponentContent;
+        const componentId = componentContent.id;
+
+        // Skip if already added
+        if (addedComponentsRef.current.has(componentId)) continue;
+
+        // Skip if already in interactables (manually added)
+        const existingInteractable = getInteractableComponent(componentId);
+        if (existingInteractable) {
+          addedComponentsRef.current.add(componentId);
+          continue;
+        }
+
+        // Find the registered component
+        const registeredComponent = componentList.find(
+          (c) => c.name === componentContent.name,
+        );
+        if (!registeredComponent) continue;
+
+        // Add to interactables with the original component ID
+        try {
+          addInteractableComponent(
+            {
+              name: componentContent.name,
+              description:
+                registeredComponent.description ||
+                `${componentContent.name} component`,
+              component: registeredComponent.component,
+              props: componentContent.props ?? {},
+              propsSchema: registeredComponent.props,
+              state: componentContent.state ?? {},
+            },
+            componentId,
+          );
+          addedComponentsRef.current.add(componentId);
+        } catch (error) {
+          console.error(
+            `Failed to auto-add component ${componentContent.name} to interactables:`,
+            error,
+          );
+        }
+      }
+    }
+  }, [
+    autoAddInteractables,
+    streamState,
+    addInteractableComponent,
+    getInteractableComponent,
+    componentList,
+  ]);
 
   const value: TamboInteractableContext = {
     interactableComponents,
