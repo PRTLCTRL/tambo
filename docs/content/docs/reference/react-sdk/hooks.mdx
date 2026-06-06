@@ -384,7 +384,7 @@ function EditableCard({ title: initialTitle }: { title: string }) {
 
 ## useTamboStreamStatus
 
-Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity.
+Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity, including support for nested objects and arrays.
 
 **Important**: Props update repeatedly during streaming and may be partial. Use `propStatus.<field>?.isSuccess` before treating a prop as complete.
 
@@ -418,6 +418,75 @@ function MyComponent(props: MyProps) {
   This hook only works inside components rendered via `ComponentRenderer`. The
   renderer provides the necessary context for tracking streaming state.
 </Callout>
+
+### Nested Objects
+
+For props with nested object structures, `propStatus` contains nested status objects that mirror the prop structure:
+
+```tsx
+interface UserProps {
+  user: {
+    name: string;
+    email: string;
+    profile: {
+      bio: string;
+      avatar: string;
+    };
+  };
+}
+
+function UserCard(props: UserProps) {
+  const { propStatus } = useTamboStreamStatus<UserProps>();
+
+  return (
+    <div>
+      <h3 className={propStatus.user?.name?.isStreaming ? "loading" : ""}>
+        {props.user?.name}
+      </h3>
+      <p className={propStatus.user?.email?.isStreaming ? "loading" : ""}>
+        {props.user?.email}
+      </p>
+      <div
+        className={propStatus.user?.profile?.bio?.isStreaming ? "loading" : ""}
+      >
+        {props.user?.profile?.bio}
+      </div>
+    </div>
+  );
+}
+```
+
+### Array Props
+
+For array props, `propStatus` includes `completedItems` and `streamingItems` arrays to track which items have finished streaming:
+
+```tsx
+interface TaskListProps {
+  tasks: Array<{ id: string; title: string; completed: boolean }>;
+}
+
+function TaskList(props: TaskListProps) {
+  const { propStatus } = useTamboStreamStatus<TaskListProps>();
+
+  const completedTasks = propStatus.tasks?.completedItems || [];
+  const streamingTasks = propStatus.tasks?.streamingItems || [];
+
+  return (
+    <div>
+      <ul>
+        {completedTasks.map((task) => (
+          <li key={task.id}>{task.title}</li>
+        ))}
+        {streamingTasks.map((task, i) => (
+          <li key={i} className="loading">
+            {task.title}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+```
 
 ## useTamboSuggestions
 
