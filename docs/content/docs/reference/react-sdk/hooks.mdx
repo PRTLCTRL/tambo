@@ -384,7 +384,7 @@ function EditableCard({ title: initialTitle }: { title: string }) {
 
 ## useTamboStreamStatus
 
-Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity.
+Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity, including support for nested objects and arrays.
 
 **Important**: Props update repeatedly during streaming and may be partial. Use `propStatus.<field>?.isSuccess` before treating a prop as complete.
 
@@ -407,12 +407,103 @@ function MyComponent(props: MyProps) {
 }
 ```
 
+### Tracking Nested Object Properties
+
+The hook automatically tracks streaming status for nested object properties. Access nested status using dot notation through the type system:
+
+```tsx
+interface UserCardProps {
+  user: {
+    name: string;
+    email: string;
+    profile: {
+      bio: string;
+      avatar: string;
+    };
+  };
+}
+
+function UserCard(props: UserCardProps) {
+  const { propStatus } = useTamboStreamStatus<UserCardProps>();
+
+  // Type-safe access to nested property status
+  const userStatus = propStatus.user as PropStatus & {
+    name?: PropStatus;
+    email?: PropStatus;
+    profile?: PropStatus & {
+      bio?: PropStatus;
+      avatar?: PropStatus;
+    };
+  };
+
+  return (
+    <div>
+      <h2 className={userStatus.name?.isStreaming ? "animate-pulse" : ""}>
+        {props.user.name}
+      </h2>
+      <p className={userStatus.email?.isStreaming ? "animate-pulse" : ""}>
+        {props.user.email}
+      </p>
+      {userStatus.profile?.bio?.isSuccess && (
+        <p>{props.user.profile.bio}</p>
+      )}
+    </div>
+  );
+}
+```
+
+### Tracking Array Items
+
+For array props, the hook provides `completedItems` and `streamingItems` to display items as they arrive:
+
+```tsx
+interface RecipeListProps {
+  recipes: Array<{
+    id: string;
+    title: string;
+    ingredients: string[];
+  }>;
+}
+
+function RecipeList(props: RecipeListProps) {
+  const { propStatus } = useTamboStreamStatus<RecipeListProps>();
+
+  const recipesStatus = propStatus.recipes;
+
+  return (
+    <div>
+      {/* Show completed items normally */}
+      {recipesStatus?.completedItems?.map((recipe) => (
+        <RecipeCard key={recipe.id} {...recipe} />
+      ))}
+
+      {/* Show streaming items with loading indicator */}
+      {recipesStatus?.streamingItems?.map((recipe) => (
+        <RecipeCard key={recipe.id} {...recipe} loading />
+      ))}
+
+      {/* Show loading state while waiting for first item */}
+      {recipesStatus?.isPending && <Skeleton count={3} />}
+    </div>
+  );
+}
+```
+
+This pattern is especially useful when streaming lists of items - users see completed items immediately while new items continue to arrive.
+
 ### Return Values
 
 | Value          | Type                                                      | Description                                                                                                                                    |
 | -------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | `streamStatus` | [`StreamStatus`](/reference/react-sdk/types#streamstatus) | Overall streaming status for the component                                                                                                     |
-| `propStatus`   | `Partial<Record<keyof Props, PropStatus>>`                | Per-prop streaming status. Keys are absent until the prop receives its first token. See [`PropStatus`](/reference/react-sdk/types#propstatus). |
+| `propStatus`   | `Partial<Record<keyof Props, NestedPropStatus<T>>>`      | Per-prop streaming status with nested support. Keys are absent until the prop receives its first token. See [`PropStatus`](/reference/react-sdk/types#propstatus). |
+
+For array props, `NestedPropStatus` extends `PropStatus` with:
+
+- `completedItems`: Array of items that have finished streaming
+- `streamingItems`: Array of items currently being streamed (typically the last item)
+
+For object props, `NestedPropStatus` extends `PropStatus` with nested properties that mirror the structure of the object, each with their own status.
 
 <Callout type="info">
   This hook only works inside components rendered via `ComponentRenderer`. The

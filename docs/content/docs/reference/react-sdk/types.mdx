@@ -635,15 +635,72 @@ interface PropStatus {
   isStreaming: boolean;
   isSuccess: boolean;
   error?: Error;
+  completedItems?: unknown[];
+  streamingItems?: unknown[];
 }
 ```
 
-| Property      | Type      | Description                                        |
-| ------------- | --------- | -------------------------------------------------- |
-| `isPending`   | `boolean` | No tokens received for this prop yet               |
-| `isStreaming` | `boolean` | Tokens received but streaming is not complete      |
-| `isSuccess`   | `boolean` | This prop has finished streaming successfully      |
-| `error`       | `Error`   | Error that occurred during streaming for this prop |
+| Property         | Type        | Description                                        |
+| ---------------- | ----------- | -------------------------------------------------- |
+| `isPending`      | `boolean`   | No tokens received for this prop yet               |
+| `isStreaming`    | `boolean`   | Tokens received but streaming is not complete      |
+| `isSuccess`      | `boolean`   | This prop has finished streaming successfully      |
+| `error`          | `Error`     | Error that occurred during streaming for this prop |
+| `completedItems` | `unknown[]` | For arrays: items that have finished streaming     |
+| `streamingItems` | `unknown[]` | For arrays: items currently being streamed         |
+
+### NestedPropStatus
+
+Type alias for recursive prop status tracking. For nested objects and arrays, `propStatus` returns a `NestedPropStatus` that mirrors the structure of your props:
+
+```typescript
+type NestedPropStatus<T> =
+  T extends Array<infer U> ? PropStatus & {
+    completedItems: U[];
+    streamingItems: U[];
+  }
+  : T extends object ? PropStatus & {
+    [K in keyof T]?: NestedPropStatus<T[K]>;
+  }
+  : PropStatus;
+```
+
+**For arrays**: Extends `PropStatus` with typed `completedItems` and `streamingItems`
+
+**For objects**: Extends `PropStatus` with nested properties that each have their own status
+
+**For primitives**: Same as `PropStatus`
+
+**Example with nested objects**:
+
+```typescript
+interface UserCardProps {
+  user: {
+    name: string;
+    email: string;
+  };
+}
+
+// propStatus.user has type:
+// PropStatus & {
+//   name?: PropStatus;
+//   email?: PropStatus;
+// }
+```
+
+**Example with arrays**:
+
+```typescript
+interface RecipeListProps {
+  recipes: { id: string; title: string }[];
+}
+
+// propStatus.recipes has type:
+// PropStatus & {
+//   completedItems: { id: string; title: string }[];
+//   streamingItems: { id: string; title: string }[];
+// }
+```
 
 ## Tool Annotations
 
