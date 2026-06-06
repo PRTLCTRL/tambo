@@ -645,6 +645,69 @@ interface PropStatus {
 | `isSuccess`   | `boolean` | This prop has finished streaming successfully      |
 | `error`       | `Error`   | Error that occurred during streaming for this prop |
 
+### ArrayPropStatus
+
+Enhanced streaming status for array properties, extends `PropStatus`.
+
+```typescript
+interface ArrayPropStatus extends PropStatus {
+  completedItems: unknown[];
+  streamingItems: unknown[];
+}
+```
+
+| Property          | Type        | Description                                         |
+| ----------------- | ----------- | --------------------------------------------------- |
+| `completedItems`  | `unknown[]` | Array items that have finished streaming            |
+| `streamingItems`  | `unknown[]` | Array items currently being streamed                |
+
+In addition to the standard `PropStatus` fields, `ArrayPropStatus` provides granular access to array items based on their streaming state. This allows you to render completed items immediately while the array continues to stream.
+
+### NestedPropStatus
+
+Type representing nested streaming status structure. Recursively mirrors your prop structure with status at each level.
+
+```typescript
+type NestedPropStatus<T> = T extends Array<infer U>
+  ? ArrayPropStatus
+  : T extends object
+    ? PropStatus & {
+        [K in keyof T]?: NestedPropStatus<T[K]>;
+      }
+    : PropStatus;
+```
+
+For primitive values and objects, returns `PropStatus`. For arrays, returns `ArrayPropStatus`. For nested objects, returns `PropStatus` with nested properties each having their own `NestedPropStatus`.
+
+**Example with nested object:**
+
+```typescript
+interface Props {
+  user: {
+    name: string;
+    email: string;
+  };
+}
+
+// propStatus.user has type:
+// PropStatus & {
+//   name?: PropStatus;
+//   email?: PropStatus;
+// }
+```
+
+**Example with array:**
+
+```typescript
+interface Props {
+  items: string[];
+}
+
+// propStatus.items has type: ArrayPropStatus
+// Includes: isPending, isStreaming, isSuccess, error,
+//           completedItems, streamingItems
+```
+
 ## Tool Annotations
 
 ### ToolAnnotations
