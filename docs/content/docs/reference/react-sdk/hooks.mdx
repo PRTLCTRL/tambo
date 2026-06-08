@@ -384,7 +384,7 @@ function EditableCard({ title: initialTitle }: { title: string }) {
 
 ## useTamboStreamStatus
 
-Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity.
+Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity, including support for nested objects and arrays.
 
 **Important**: Props update repeatedly during streaming and may be partial. Use `propStatus.<field>?.isSuccess` before treating a prop as complete.
 
@@ -413,6 +413,129 @@ function MyComponent(props: MyProps) {
 | -------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | `streamStatus` | [`StreamStatus`](/reference/react-sdk/types#streamstatus) | Overall streaming status for the component                                                                                                     |
 | `propStatus`   | `Partial<Record<keyof Props, PropStatus>>`                | Per-prop streaming status. Keys are absent until the prop receives its first token. See [`PropStatus`](/reference/react-sdk/types#propstatus). |
+
+### Nested Object Support
+
+Track streaming status for nested object properties:
+
+```tsx
+interface UserCardProps {
+  user: {
+    name: string;
+    email: string;
+    profile: {
+      bio: string;
+      avatar: string;
+    };
+  };
+}
+
+function UserCard(props: UserCardProps) {
+  const { propStatus } = useTamboStreamStatus<UserCardProps>();
+
+  // Access nested prop status via type assertion
+  const userStatus = propStatus.user as PropStatus & {
+    name: PropStatus;
+    email: PropStatus;
+    profile: PropStatus & {
+      bio: PropStatus;
+      avatar: PropStatus;
+    };
+  };
+
+  return (
+    <div>
+      <h2 className={userStatus.name?.isStreaming ? "pulse" : ""}>
+        {props.user.name}
+      </h2>
+      <p className={userStatus.email?.isStreaming ? "pulse" : ""}>
+        {props.user.email}
+      </p>
+      {userStatus.profile.avatar.isSuccess && (
+        <img src={props.user.profile.avatar} alt="Avatar" />
+      )}
+    </div>
+  );
+}
+```
+
+### Array Item Support
+
+Display only completed items from array props during streaming:
+
+```tsx
+interface ListProps {
+  items: Array<{ id: string; name: string; price: number }>;
+}
+
+function ProductList(props: ListProps) {
+  const { propStatus } = useTamboStreamStatus<ListProps>();
+
+  // Show only completed items while streaming
+  const displayItems =
+    propStatus.items?.completedItems || props.items || [];
+
+  return (
+    <ul>
+      {displayItems.map((item) => (
+        <li key={item.id}>
+          {item.name} - ${item.price}
+        </li>
+      ))}
+      {propStatus.items?.isStreaming && (
+        <li>Loading more items...</li>
+      )}
+    </ul>
+  );
+}
+```
+
+### Mixed Nested and Array Support
+
+Combine nested objects and arrays for complex data structures:
+
+```tsx
+interface DashboardProps {
+  config: {
+    theme: string;
+    layout: string;
+  };
+  widgets: Array<{
+    id: string;
+    type: string;
+    settings: {
+      title: string;
+      data: number[];
+    };
+  }>;
+}
+
+function Dashboard(props: DashboardProps) {
+  const { propStatus, streamStatus } = useTamboStreamStatus<DashboardProps>();
+
+  const configStatus = propStatus.config as PropStatus & {
+    theme: PropStatus;
+    layout: PropStatus;
+  };
+
+  // Render completed widgets only
+  const completedWidgets =
+    (propStatus.widgets?.completedItems as DashboardProps["widgets"]) || [];
+
+  return (
+    <div>
+      {configStatus.theme?.isSuccess && (
+        <div className={`theme-${props.config.theme}`}>
+          {completedWidgets.map((widget) => (
+            <Widget key={widget.id} {...widget} />
+          ))}
+        </div>
+      )}
+      {streamStatus.isStreaming && <LoadingSpinner />}
+    </div>
+  );
+}
+```
 
 <Callout type="info">
   This hook only works inside components rendered via `ComponentRenderer`. The
