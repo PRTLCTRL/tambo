@@ -627,7 +627,7 @@ interface StreamStatus {
 
 ### PropStatus
 
-Per-prop streaming status, returned by `useTamboStreamStatus()`.
+Per-prop streaming status, returned by `useTamboStreamStatus()`. For nested objects, each nested field has its own `PropStatus`. For arrays, includes `completedItems` and `streamingItems`.
 
 ```typescript
 interface PropStatus {
@@ -635,15 +635,21 @@ interface PropStatus {
   isStreaming: boolean;
   isSuccess: boolean;
   error?: Error;
+  completedItems?: unknown[]; // For array props only
+  streamingItems?: unknown[]; // For array props only
+  [key: string]: PropStatus | boolean | Error | unknown[] | undefined; // For nested objects
 }
 ```
 
-| Property      | Type      | Description                                        |
-| ------------- | --------- | -------------------------------------------------- |
-| `isPending`   | `boolean` | No tokens received for this prop yet               |
-| `isStreaming` | `boolean` | Tokens received but streaming is not complete      |
-| `isSuccess`   | `boolean` | This prop has finished streaming successfully      |
-| `error`       | `Error`   | Error that occurred during streaming for this prop |
+| Property          | Type        | Description                                                                              |
+| ----------------- | ----------- | ---------------------------------------------------------------------------------------- |
+| `isPending`       | `boolean`   | No tokens received for this prop yet                                                     |
+| `isStreaming`     | `boolean`   | Tokens received but streaming is not complete                                            |
+| `isSuccess`       | `boolean`   | This prop has finished streaming successfully                                            |
+| `error`           | `Error`     | Error that occurred during streaming for this prop                                       |
+| `completedItems`  | `unknown[]` | For array props: items that have finished streaming                                      |
+| `streamingItems`  | `unknown[]` | For array props: items currently being streamed                                          |
+| `[key]`           | `PropStatus`| For object props: nested `PropStatus` for each property (access via `propStatus.parent.child`) |
 
 ## Tool Annotations
 
