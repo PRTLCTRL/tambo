@@ -5,6 +5,9 @@ import { ComponentRenderer } from "./v1-component-renderer";
 import { TamboRegistryContext } from "../../providers/tambo-registry-provider";
 import type { TamboRegistryContext as TamboRegistryContextType } from "../../providers/tambo-registry-provider";
 import type { TamboComponentContent } from "../types/message";
+import { TamboConfigContext } from "../providers/tambo-v1-provider";
+import { TamboInteractableProvider } from "../../providers/tambo-interactable-provider";
+import { useTamboInteractable } from "../../providers/tambo-interactable-provider";
 
 // Simple test component
 const TestComponent: React.FC<{ title: string; count?: number }> = ({
@@ -411,5 +414,199 @@ describe("ComponentRenderer", () => {
     );
 
     expect(screen.getByTestId("context-aware")).toBeInTheDocument();
+  });
+
+  describe("auto-add to interactables", () => {
+    const InteractablesMonitor: React.FC = () => {
+      const { interactableComponents } = useTamboInteractable();
+      return (
+        <div data-testid="interactables-count">
+          {interactableComponents.length}
+        </div>
+      );
+    };
+
+    it("should add component to interactables when autoAddComponentsToInteractables is enabled and streaming is done", () => {
+      const registry = createMockRegistry({
+        TestComponent: {
+          name: "TestComponent",
+          description: "A test component",
+          component: TestComponent,
+          props: { type: "object" },
+          contextTools: [],
+        },
+      });
+
+      const content: TamboComponentContent = {
+        type: "component",
+        id: "comp_auto_123",
+        name: "TestComponent",
+        props: { title: "Auto Test" },
+        streamingState: "done",
+      };
+
+      const config = {
+        autoAddComponentsToInteractables: true,
+      };
+
+      render(
+        <TamboConfigContext.Provider value={config}>
+          <TamboRegistryContext.Provider value={registry}>
+            <TamboInteractableProvider>
+              <ComponentRenderer
+                content={content}
+                threadId="thread_123"
+                messageId="msg_456"
+              />
+              <InteractablesMonitor />
+            </TamboInteractableProvider>
+          </TamboRegistryContext.Provider>
+        </TamboConfigContext.Provider>,
+      );
+
+      expect(screen.getByTestId("interactables-count")).toHaveTextContent("1");
+    });
+
+    it("should NOT add component to interactables when autoAddComponentsToInteractables is disabled", () => {
+      const registry = createMockRegistry({
+        TestComponent: {
+          name: "TestComponent",
+          description: "A test component",
+          component: TestComponent,
+          props: { type: "object" },
+          contextTools: [],
+        },
+      });
+
+      const content: TamboComponentContent = {
+        type: "component",
+        id: "comp_no_auto_123",
+        name: "TestComponent",
+        props: { title: "No Auto Test" },
+        streamingState: "done",
+      };
+
+      const config = {
+        autoAddComponentsToInteractables: false,
+      };
+
+      render(
+        <TamboConfigContext.Provider value={config}>
+          <TamboRegistryContext.Provider value={registry}>
+            <TamboInteractableProvider>
+              <ComponentRenderer
+                content={content}
+                threadId="thread_123"
+                messageId="msg_456"
+              />
+              <InteractablesMonitor />
+            </TamboInteractableProvider>
+          </TamboRegistryContext.Provider>
+        </TamboConfigContext.Provider>,
+      );
+
+      expect(screen.getByTestId("interactables-count")).toHaveTextContent("0");
+    });
+
+    it("should NOT add component to interactables when streaming is not done", () => {
+      const registry = createMockRegistry({
+        TestComponent: {
+          name: "TestComponent",
+          description: "A test component",
+          component: TestComponent,
+          props: { type: "object" },
+          contextTools: [],
+        },
+      });
+
+      const content: TamboComponentContent = {
+        type: "component",
+        id: "comp_streaming_123",
+        name: "TestComponent",
+        props: { title: "Streaming Test" },
+        streamingState: "streaming",
+      };
+
+      const config = {
+        autoAddComponentsToInteractables: true,
+      };
+
+      render(
+        <TamboConfigContext.Provider value={config}>
+          <TamboRegistryContext.Provider value={registry}>
+            <TamboInteractableProvider>
+              <ComponentRenderer
+                content={content}
+                threadId="thread_123"
+                messageId="msg_456"
+              />
+              <InteractablesMonitor />
+            </TamboInteractableProvider>
+          </TamboRegistryContext.Provider>
+        </TamboConfigContext.Provider>,
+      );
+
+      expect(screen.getByTestId("interactables-count")).toHaveTextContent("0");
+    });
+
+    it("should NOT add the same component twice", () => {
+      const registry = createMockRegistry({
+        TestComponent: {
+          name: "TestComponent",
+          description: "A test component",
+          component: TestComponent,
+          props: { type: "object" },
+          contextTools: [],
+        },
+      });
+
+      const content: TamboComponentContent = {
+        type: "component",
+        id: "comp_duplicate_123",
+        name: "TestComponent",
+        props: { title: "Duplicate Test" },
+        streamingState: "done",
+      };
+
+      const config = {
+        autoAddComponentsToInteractables: true,
+      };
+
+      const { rerender } = render(
+        <TamboConfigContext.Provider value={config}>
+          <TamboRegistryContext.Provider value={registry}>
+            <TamboInteractableProvider>
+              <ComponentRenderer
+                content={content}
+                threadId="thread_123"
+                messageId="msg_456"
+              />
+              <InteractablesMonitor />
+            </TamboInteractableProvider>
+          </TamboRegistryContext.Provider>
+        </TamboConfigContext.Provider>,
+      );
+
+      expect(screen.getByTestId("interactables-count")).toHaveTextContent("1");
+
+      // Re-render with the same component
+      rerender(
+        <TamboConfigContext.Provider value={config}>
+          <TamboRegistryContext.Provider value={registry}>
+            <TamboInteractableProvider>
+              <ComponentRenderer
+                content={content}
+                threadId="thread_123"
+                messageId="msg_456"
+              />
+              <InteractablesMonitor />
+            </TamboInteractableProvider>
+          </TamboRegistryContext.Provider>
+        </TamboConfigContext.Provider>,
+      );
+
+      // Should still be 1, not 2
+      expect(screen.getByTestId("interactables-count")).toHaveTextContent("1");
+    });
   });
 });
