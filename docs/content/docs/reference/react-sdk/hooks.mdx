@@ -384,7 +384,7 @@ function EditableCard({ title: initialTitle }: { title: string }) {
 
 ## useTamboStreamStatus
 
-Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity.
+Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity, with support for nested objects and arrays.
 
 **Important**: Props update repeatedly during streaming and may be partial. Use `propStatus.<field>?.isSuccess` before treating a prop as complete.
 
@@ -413,6 +413,77 @@ function MyComponent(props: MyProps) {
 | -------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | `streamStatus` | [`StreamStatus`](/reference/react-sdk/types#streamstatus) | Overall streaming status for the component                                                                                                     |
 | `propStatus`   | `Partial<Record<keyof Props, PropStatus>>`                | Per-prop streaming status. Keys are absent until the prop receives its first token. See [`PropStatus`](/reference/react-sdk/types#propstatus). |
+
+### Nested Object Tracking
+
+When props contain nested objects, `propStatus` includes nested status objects for each level. Access nested streaming status using dot notation on the status object:
+
+```tsx
+interface UserCardProps {
+  user: {
+    name: string;
+    email: string;
+    profile: {
+      bio: string;
+      avatar: string;
+    };
+  };
+}
+
+function UserCard(props: UserCardProps) {
+  const { propStatus } = useTamboStreamStatus<UserCardProps>();
+
+  return (
+    <div>
+      {propStatus.user?.name?.isStreaming && <Skeleton className="h-6 w-32" />}
+      {!propStatus.user?.name?.isStreaming && <h2>{props.user.name}</h2>}
+
+      {propStatus.user?.profile?.bio?.isStreaming && (
+        <Skeleton className="h-20 w-full" />
+      )}
+      {propStatus.user?.profile?.bio?.isSuccess && <p>{props.user.profile.bio}</p>}
+    </div>
+  );
+}
+```
+
+### Array Item Tracking
+
+For array props, `PropStatus` includes `completedItems` (items that finished streaming) and `streamingItems` (the current item being streamed). This lets you display completed items while the last item is still generating:
+
+```tsx
+interface ProductListProps {
+  products: Array<{
+    id: string;
+    name: string;
+    price: number;
+  }>;
+}
+
+function ProductList(props: ProductListProps) {
+  const { propStatus } = useTamboStreamStatus<ProductListProps>();
+
+  const completedProducts = propStatus.products?.completedItems ?? [];
+  const streamingProduct = propStatus.products?.streamingItems?.[0];
+
+  return (
+    <ul>
+      {completedProducts.map((product) => (
+        <li key={product.id}>
+          {product.name} - ${product.price}
+        </li>
+      ))}
+      {streamingProduct && (
+        <li className="animate-pulse opacity-50">
+          {streamingProduct.name} - ${streamingProduct.price}
+        </li>
+      )}
+    </ul>
+  );
+}
+```
+
+When streaming completes, all items move to `completedItems` and `streamingItems` becomes `undefined`.
 
 <Callout type="info">
   This hook only works inside components rendered via `ComponentRenderer`. The
