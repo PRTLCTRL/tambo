@@ -27,6 +27,7 @@ import {
   TamboRegistryContext,
   type TamboRegistryContext as TamboRegistryContextType,
 } from "../../providers/tambo-registry-provider";
+import { useTamboInteractable } from "../../providers/tambo-interactable-provider";
 import { ComponentRenderer } from "../components/v1-component-renderer";
 import {
   useStreamDispatch,
@@ -208,16 +209,22 @@ interface ComponentCacheEntry {
 export function useTambo(): UseTamboReturn {
   const client = useTamboClient();
   const queryClient = useTamboQueryClient();
-  const { userKey } = useTamboConfig();
+  const { userKey, autoAddComponentsToInteractables } = useTamboConfig();
   const streamState = useStreamState();
   const dispatch = useStreamDispatch();
   const registry = useContext(TamboRegistryContext);
   const threadManagement = useThreadManagement();
   const authState = useTamboAuthState();
+  const { addInteractableComponent, getInteractableComponent } =
+    useTamboInteractable();
 
   // Cache for rendered component wrappers - maintains stable element references
   // across renders when props haven't changed
   const componentCacheRef = useRef(new Map<string, ComponentCacheEntry>());
+
+  // Track which component content IDs have been added to interactables
+  // to avoid duplicate additions
+  const addedToInteractablesRef = useRef(new Set<string>());
 
   // Get thread state for the current thread
   const threadState = streamState.threadMap[streamState.currentThreadId];
@@ -369,6 +376,32 @@ export function useTambo(): UseTamboReturn {
         const cache = componentCacheRef.current;
         const cached = cache.get(componentContent.id);
 
+        // Auto-add to interactables if enabled and not already added
+        if (
+          autoAddComponentsToInteractables &&
+          !addedToInteractablesRef.current.has(componentContent.id) &&
+          componentContent.streamingState === "complete"
+        ) {
+          const registeredComponent = registry.componentList[componentContent.name];
+
+          if (registeredComponent) {
+            // Only add if not already in interactables
+            const existing = getInteractableComponent(componentContent.id);
+            if (!existing) {
+              addInteractableComponent({
+                name: componentContent.name,
+                description:
+                  registeredComponent.description ??
+                  `Interactable ${componentContent.name}`,
+                component: registeredComponent.component,
+                props: componentContent.props ?? {},
+                propsSchema: registeredComponent.props,
+              });
+              addedToInteractablesRef.current.add(componentContent.id);
+            }
+          }
+        }
+
         // Return cached element if props haven't changed
         if (cached?.propsJson === propsJson) {
           return {
@@ -433,5 +466,8 @@ export function useTambo(): UseTamboReturn {
     threadManagement,
     dispatch,
     authState,
+    autoAddComponentsToInteractables,
+    addInteractableComponent,
+    getInteractableComponent,
   ]);
 }
