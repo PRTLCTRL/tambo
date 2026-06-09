@@ -63,6 +63,12 @@ export interface TamboConfig {
    * These are displayed in the UI immediately and sent to the API on first message.
    */
   initialMessages?: InitialInputMessage[];
+  /**
+   * When enabled, all AI-generated components are automatically registered as interactables.
+   * This allows components to be updated in-place rather than generating new ones.
+   * Defaults to false.
+   */
+  autoAddInteractables?: boolean;
 }
 
 /**
@@ -173,6 +179,13 @@ export interface TamboProviderProps extends Pick<
   initialMessages?: InitialInputMessage[];
 
   /**
+   * When enabled, all AI-generated components are automatically registered as interactables.
+   * This allows components to be updated in-place rather than generating new ones.
+   * Defaults to false.
+   */
+  autoAddInteractables?: boolean;
+
+  /**
    * Children components
    */
   children: React.ReactNode;
@@ -238,6 +251,7 @@ function TamboAuthWarnings(): null {
  * @param props.autoGenerateThreadName - Whether to automatically generate thread names. Defaults to true.
  * @param props.autoGenerateNameThreshold - The message count threshold at which the thread name will be auto-generated. Defaults to 3.
  * @param props.initialMessages - Optional initial messages to prepend to the first thread.
+ * @param props.autoAddInteractables - Whether to automatically register AI-generated components as interactables. Defaults to false.
  * @param props.children - Child components
  * @returns Provider component tree
  * @example
@@ -274,6 +288,7 @@ export function TamboProvider({
   autoGenerateThreadName,
   autoGenerateNameThreshold,
   initialMessages,
+  autoAddInteractables,
   children,
 }: PropsWithChildren<TamboProviderProps>) {
   // Config is static - created once and never changes
@@ -282,6 +297,7 @@ export function TamboProvider({
     autoGenerateThreadName,
     autoGenerateNameThreshold,
     initialMessages,
+    autoAddInteractables,
   };
 
   return (
