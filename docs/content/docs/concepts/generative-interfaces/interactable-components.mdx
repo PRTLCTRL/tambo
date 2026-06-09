@@ -6,13 +6,17 @@ description: Allow Tambo to update your pre-placed components
 import LearnMore from "@/components/learn-more";
 import { Rocket } from "lucide-react";
 
-When you want to place specific components on screen rather than letting Tambo choose which to show, but still want to allow your users to interact with them using natural language, use Tambo's Interactable components. Unlike [generative components](/concepts/generative-interfaces/generative-components) that Tambo creates on-demand when responding to messages, Interactable components are **pre-placed by you** while still allowing Tambo to modify their props when responding to users.
+When you want to place specific components on screen rather than letting Tambo choose which to show, but still want to allow your users to interact with them using natural language, use Tambo's Interactable components. Unlike [generative components](/concepts/generative-interfaces/generative-components) that Tambo creates on-demand when responding to messages, Interactable components can be **pre-placed by you** or **automatically added from AI-generated components** while still allowing Tambo to modify their props when responding to users.
 
 You place them, set their initial state, and users can interact with them directly like any other React component. Simultaneously, Tambo can observe their current props values and update them through natural language requests.
 
 This creates a conversational interface where traditional UI manipulation and natural language interaction work together. A user might click and edit a note's title, then ask Tambo to "update the content of this note with today's meeting notes," both modifying the same component.
 
 ## How Interactables Work
+
+There are two ways to make components interactable:
+
+### Manual Mode (Pre-placed Components)
 
 Interactables are normal React components that you build and then wrap with Tambo's `withTamboInteractable` to give Tambo access to them.
 
@@ -36,6 +40,51 @@ When you wrap a component with `withTamboInteractable`, Tambo creates an automat
 **Automatic Tool Registration**: Update tools are automatically registered to allow Tambo to update the component's props when needed.
 
 Place these wherever you normally would within the application to enable a traditional, statically-organized, user interface enhanced with AI capabilities.
+
+### Automatic Mode (AI-Generated Components)
+
+Instead of pre-placing components, you can enable automatic interactables mode. When enabled, every component the AI generates is automatically added to the interactables list, making it available for updates in future messages.
+
+```tsx
+import { TamboProvider } from "@tambo-ai/react";
+
+function App() {
+  return (
+    <TamboProvider
+      apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
+      components={[WeatherCard, StockChart]}
+      autoAddComponentsToInteractables={true} // Enable automatic mode
+    >
+      <ChatInterface />
+    </TamboProvider>
+  );
+}
+```
+
+With automatic mode enabled:
+
+1. User asks: "Show me a weather card for San Francisco"
+2. AI generates a `WeatherCard` component → automatically added to interactables
+3. User asks: "Update that card to show Seattle instead"
+4. AI updates the existing `WeatherCard` component's props
+
+This is perfect for workflows where users want to iteratively refine generated components rather than creating new ones each time.
+
+## When to Use Each Mode
+
+**Use Manual Mode (withTamboInteractable) when:**
+- You have a fixed UI layout with specific component positions
+- You want precise control over which components are interactable
+- You're building dashboard-style interfaces with persistent components
+- Users expect components to stay in specific locations
+
+**Use Automatic Mode (autoAddComponentsToInteractables) when:**
+- You want a chat-focused interface where components flow naturally in the conversation
+- Users are iterating on generated components (e.g., "make it bigger", "change the color")
+- You want to display only the most recent version of each component type
+- The order and position of components matters less than the content
+
+**Combine Both Modes** for hybrid interfaces where some components are fixed (sidebar widgets) and others flow naturally (chat messages).
 
 <LearnMore
   title="How to register Interactable components"

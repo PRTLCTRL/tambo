@@ -23,6 +23,7 @@ import { makeJsonSchemaPartial, schemaToJsonSchema } from "../schema";
 import { assertValidName } from "../util/validate-component-name";
 import { useTamboRegistry } from "./tambo-registry-provider";
 import { useTamboContextHelpers } from "./tambo-context-helpers-provider";
+import type { TamboComponentContent } from "../v1/types/message";
 
 const TamboInteractableContext = createContext<TamboInteractableContext>({
   interactableComponents: [],
@@ -562,10 +563,117 @@ export const TamboInteractableProvider: React.FC<PropsWithChildren> = ({
 
   return (
     <TamboInteractableContext.Provider value={value}>
+      <AutoAddComponentsToInteractables />
       {children}
     </TamboInteractableContext.Provider>
   );
 };
+
+/**
+ * Internal component that automatically adds generated components to interactables
+ * when the autoAddComponentsToInteractables setting is enabled.
+ * @internal
+ * @returns null - this component renders nothing
+ */
+function AutoAddComponentsToInteractables(): null {
+  // Track which component IDs we've already added to avoid duplicates
+  const processedComponentIdsRef = useRef<Set<string>>(new Set());
+
+  // Try to access config - if not available, auto-add is disabled
+  let config: { autoAddComponentsToInteractables?: boolean } | null = null;
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const { useTamboConfig } = require("../v1/providers/tambo-v1-provider");
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    config = useTamboConfig();
+  } catch {
+    // Config not available - provider is being used standalone
+  }
+
+  // Try to access stream state - if not available, we can't watch messages
+  let streamState: { currentThreadId?: string; threadMap?: Record<string, { thread: { messages: Array<{ role: string; content: Array<{ type: string; id?: string; name?: string; props?: Record<string, unknown> }> }> } }> } | null = null;
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const { useStreamState } = require("../v1/providers/tambo-v1-stream-context");
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    streamState = useStreamState();
+  } catch {
+    // Stream state not available
+  }
+
+  const { addInteractableComponent } = useContext(TamboInteractableContext);
+  const { componentList } = useTamboRegistry();
+
+  // Watch for new assistant messages with components
+  useEffect(() => {
+    // Feature disabled or required contexts not available
+    if (!config?.autoAddComponentsToInteractables || !streamState) {
+      return;
+    }
+
+    const currentThreadId = streamState.currentThreadId;
+    if (!currentThreadId) return;
+
+    const threadState = streamState.threadMap?.[currentThreadId];
+    if (!threadState) return;
+
+    const messages = threadState.thread.messages;
+
+    // Process all assistant messages
+    for (const message of messages) {
+      if (message.role !== "assistant") continue;
+
+      // Find component content blocks
+      for (const content of message.content) {
+        if (content.type !== "component") continue;
+
+        const componentContent = content as TamboComponentContent;
+
+        // Skip if already processed
+        if (!componentContent.id || processedComponentIdsRef.current.has(componentContent.id)) {
+          continue;
+        }
+
+        // Find the registered component
+        const registeredComponent = componentList.find(
+          (c) => c.name === componentContent.name,
+        );
+
+        if (!registeredComponent) {
+          // Component not registered - can't add to interactables
+          continue;
+        }
+
+        // Add to interactables
+        try {
+          addInteractableComponent({
+            name: registeredComponent.name,
+            description: registeredComponent.description,
+            component: registeredComponent.component,
+            props: componentContent.props ?? {},
+            propsSchema: registeredComponent.propsSchema,
+            annotations: registeredComponent.annotations,
+          });
+
+          // Mark as processed
+          processedComponentIdsRef.current.add(componentContent.id);
+        } catch (error) {
+          console.warn(
+            `[AutoAddComponentsToInteractables] Failed to add component ${componentContent.name} (${componentContent.id}):`,
+            error,
+          );
+        }
+      }
+    }
+  }, [
+    config?.autoAddComponentsToInteractables,
+    streamState,
+    addInteractableComponent,
+    componentList,
+  ]);
+
+  return null;
+}
 
 /**
  * The useTamboInteractable hook provides access to the interactable component
