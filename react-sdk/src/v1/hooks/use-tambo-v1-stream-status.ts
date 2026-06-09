@@ -80,21 +80,156 @@ export interface PropStatus {
    * Will be undefined if no error occurred for this prop.
    */
   error?: Error;
+
+  /**
+   * For array props: items that have finished streaming.
+   * Only present when the prop is an array.
+   */
+  completedItems?: unknown[];
+
+  /**
+   * For array props: items currently streaming (not yet complete).
+   * Only present when the prop is an array.
+   */
+  streamingItems?: unknown[];
+}
+
+/**
+ * Recursive prop status that includes nested object properties.
+ * Each nested object has its own PropStatus plus nested properties.
+ */
+export type NestedPropStatus = PropStatus & {
+  [key: string]: PropStatus | NestedPropStatus | undefined;
+};
+
+/**
+ * Track which properties in an object have received content.
+ * Recursively tracks nested objects and arrays.
+ * @param obj - Object to track
+ * @param path - Current path (for nested tracking)
+ * @param startedProps - Set of paths that have started
+ * @returns Updated set of started property paths
+ */
+function trackStartedProps(
+  obj: unknown,
+  path: string,
+  startedProps: Set<string>,
+): Set<string> {
+  if (obj === undefined || obj === null) {
+    return startedProps;
+  }
+
+  // Mark this path as started if it has content
+  const hasContent = obj !== "";
+  if (hasContent && !startedProps.has(path)) {
+    startedProps.add(path);
+  }
+
+  // Recursively track nested objects
+  if (typeof obj === "object" && !Array.isArray(obj)) {
+    for (const [key, value] of Object.entries(obj)) {
+      const nestedPath = path ? `${path}.${key}` : key;
+      trackStartedProps(value, nestedPath, startedProps);
+    }
+  }
+
+  // For arrays, track each item
+  if (Array.isArray(obj)) {
+    for (let i = 0; i < obj.length; i++) {
+      const itemPath = `${path}[${i}]`;
+      trackStartedProps(obj[i], itemPath, startedProps);
+    }
+  }
+
+  return startedProps;
+}
+
+/**
+ * Build nested prop status for a value.
+ * @param value - The prop value
+ * @param path - Current path for nested tracking
+ * @param startedProps - Set of started property paths
+ * @param isStreamingDone - Whether component streaming is done
+ * @param isComponentStreaming - Whether component is actively streaming
+ * @returns PropStatus with nested properties
+ */
+function buildPropStatus(
+  value: unknown,
+  path: string,
+  startedProps: Set<string>,
+  isStreamingDone: boolean,
+  isComponentStreaming: boolean,
+): PropStatus | NestedPropStatus {
+  const hasStarted = startedProps.has(path);
+  const isComplete = hasStarted && isStreamingDone;
+
+  const baseStatus: PropStatus = {
+    isPending: !hasStarted && !isComplete,
+    isStreaming: hasStarted && !isComplete && isComponentStreaming,
+    isSuccess: isComplete,
+    error: undefined,
+  };
+
+  // Handle arrays: track completed vs streaming items
+  if (Array.isArray(value)) {
+    const completedItems: unknown[] = [];
+    const streamingItems: unknown[] = [];
+
+    for (let i = 0; i < value.length; i++) {
+      const itemPath = `${path}[${i}]`;
+      const itemStarted = startedProps.has(itemPath);
+      const itemComplete = itemStarted && isStreamingDone;
+
+      if (itemComplete) {
+        completedItems.push(value[i]);
+      } else if (itemStarted) {
+        streamingItems.push(value[i]);
+      }
+    }
+
+    return {
+      ...baseStatus,
+      completedItems: isStreamingDone ? value : completedItems,
+      streamingItems: isStreamingDone ? [] : streamingItems,
+    };
+  }
+
+  // Handle nested objects: recursively build status
+  if (typeof value === "object" && value !== null) {
+    const nested: NestedPropStatus = { ...baseStatus };
+
+    for (const [key, nestedValue] of Object.entries(value)) {
+      const nestedPath = path ? `${path}.${key}` : key;
+      nested[key] = buildPropStatus(
+        nestedValue,
+        nestedPath,
+        startedProps,
+        isStreamingDone,
+        isComponentStreaming,
+      );
+    }
+
+    return nested;
+  }
+
+  // Primitive value
+  return baseStatus;
 }
 
 /**
  * Track streaming status for individual props by monitoring their values.
  * Monitors when props receive their first token and when they complete streaming.
+ * Supports nested objects and arrays.
  * @template Props - The type of the component props being tracked
  * @param props - The current component props object
  * @param componentStreamingState - The current streaming state of the component
- * @returns A record mapping each prop key to its PropStatus
+ * @returns A record mapping each prop key to its PropStatus (with nested properties for objects)
  */
 function usePropsStreamingStatus<Props extends object>(
   props: Props | undefined,
   componentStreamingState: TamboComponentContent["streamingState"] | undefined,
-): Partial<Record<keyof Props, PropStatus>> {
-  /** Track which props have received content */
+): Partial<Record<keyof Props, PropStatus | NestedPropStatus>> {
+  /** Track which property paths have received content */
   const [startedProps, setStartedProps] = useState(new Set<string>());
 
   /** Update started props when content arrives */
@@ -103,13 +238,12 @@ function usePropsStreamingStatus<Props extends object>(
 
     setStartedProps((prev) => {
       let changed = false;
-      const newStarted = new Set(prev);
+      let newStarted = new Set(prev);
 
       for (const [key, value] of Object.entries(props)) {
-        const hasContent =
-          value !== undefined && value !== null && value !== "";
-        if (hasContent && !newStarted.has(key)) {
-          newStarted.add(key);
+        const initialSize = newStarted.size;
+        newStarted = trackStartedProps(value, key, newStarted);
+        if (newStarted.size > initialSize) {
           changed = true;
         }
       }
@@ -125,17 +259,15 @@ function usePropsStreamingStatus<Props extends object>(
     const isStreamingDone = componentStreamingState === "done";
     const isComponentStreaming = componentStreamingState === "streaming";
 
-    const result = {} as Record<keyof Props, PropStatus>;
-    for (const key of Object.keys(props)) {
-      const hasStarted = startedProps.has(key);
-      const isComplete = hasStarted && isStreamingDone;
-
-      result[key as keyof Props] = {
-        isPending: !hasStarted && !isComplete,
-        isStreaming: hasStarted && !isComplete && isComponentStreaming,
-        isSuccess: isComplete,
-        error: undefined,
-      };
+    const result = {} as Record<keyof Props, PropStatus | NestedPropStatus>;
+    for (const [key, value] of Object.entries(props)) {
+      result[key as keyof Props] = buildPropStatus(
+        value,
+        key,
+        startedProps,
+        isStreamingDone,
+        isComponentStreaming,
+      );
     }
     return result;
   }, [props, startedProps, componentStreamingState]);

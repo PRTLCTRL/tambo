@@ -384,7 +384,7 @@ function EditableCard({ title: initialTitle }: { title: string }) {
 
 ## useTamboStreamStatus
 
-Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity.
+Track streaming status for components rendered via `ComponentRenderer`. Provides both overall stream status and per-prop granularity, including support for nested objects and arrays.
 
 **Important**: Props update repeatedly during streaming and may be partial. Use `propStatus.<field>?.isSuccess` before treating a prop as complete.
 
@@ -418,6 +418,108 @@ function MyComponent(props: MyProps) {
   This hook only works inside components rendered via `ComponentRenderer`. The
   renderer provides the necessary context for tracking streaming state.
 </Callout>
+
+### Nested Object Tracking
+
+For props with nested object structures, `propStatus` provides status tracking for each nested property:
+
+```tsx
+interface UserCardProps {
+  user: {
+    name: string;
+    email: string;
+    address: {
+      street: string;
+      city: string;
+    };
+  };
+}
+
+function UserCard(props: UserCardProps) {
+  const { propStatus } = useTamboStreamStatus<UserCardProps>();
+
+  const userStatus = propStatus.user;
+
+  return (
+    <div>
+      <h2 className={userStatus?.name?.isStreaming ? "animate-pulse" : ""}>
+        {props.user.name}
+      </h2>
+      <p className={userStatus?.email?.isStreaming ? "animate-pulse" : ""}>
+        {props.user.email}
+      </p>
+      <address>
+        <div
+          className={
+            userStatus?.address?.street?.isStreaming ? "animate-pulse" : ""
+          }
+        >
+          {props.user.address.street}
+        </div>
+        <div
+          className={
+            userStatus?.address?.city?.isStreaming ? "animate-pulse" : ""
+          }
+        >
+          {props.user.address.city}
+        </div>
+      </address>
+    </div>
+  );
+}
+```
+
+Each nested property has its own `PropStatus` with `isPending`, `isStreaming`, `isSuccess`, and `error` flags.
+
+### Array Tracking
+
+For array props, `propStatus` provides `completedItems` and `streamingItems` to differentiate between items that have finished streaming and those still in progress:
+
+```tsx
+interface TaskListProps {
+  tasks: Array<{ id: string; title: string; status: string }>;
+}
+
+function TaskList(props: TaskListProps) {
+  const { propStatus } = useTamboStreamStatus<TaskListProps>();
+
+  const tasksStatus = propStatus.tasks;
+
+  return (
+    <div>
+      {tasksStatus?.completedItems && tasksStatus.completedItems.length > 0 && (
+        <div>
+          <h3>Completed Tasks</h3>
+          <ul>
+            {(tasksStatus.completedItems as TaskListProps["tasks"]).map(
+              (task) => (
+                <li key={task.id}>{task.title}</li>
+              ),
+            )}
+          </ul>
+        </div>
+      )}
+
+      {tasksStatus?.streamingItems && tasksStatus.streamingItems.length > 0 && (
+        <div>
+          <h3>Loading Tasks</h3>
+          <ul>
+            {(tasksStatus.streamingItems as TaskListProps["tasks"]).map(
+              (task) => (
+                <li key={task.id} className="animate-pulse">
+                  {task.title}
+                </li>
+              ),
+            )}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+The `completedItems` array contains items that have finished streaming, while `streamingItems` contains items currently being streamed. When streaming completes, all items move to `completedItems`.
 
 ## useTamboSuggestions
 
