@@ -25,7 +25,7 @@ const cardComponent: TamboComponent = {
   name: "Card",
   description: "A simple card component",
   component: Card,
-  props: z.object({
+  propsSchema: z.object({
     title: z.string(),
     content: z.string(),
   }),

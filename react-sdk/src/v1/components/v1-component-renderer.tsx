@@ -114,9 +114,9 @@ export const ComponentRenderer: FC<ComponentRendererProps> = ({
       name: content.name,
       description: registeredComponent.description ?? "",
       component: registeredComponent.component,
-      props: content.props ?? {},
+      props: (content.props ?? {}) as Record<string, unknown>,
       propsSchema: registeredComponent.props,
-      state: content.state ?? {},
+      state: (content.state ?? {}) as Record<string, unknown>,
     });
   }, [
     config.autoAddInteractables,

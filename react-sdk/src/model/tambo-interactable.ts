@@ -21,7 +21,9 @@ export interface TamboInteractableContext {
   interactableComponents: TamboInteractableComponent[];
   /** Add a new interactable component */
   addInteractableComponent: (
-    component: Omit<TamboInteractableComponent, "createdAt"> & { id?: string },
+    component: Omit<TamboInteractableComponent, "id" | "createdAt"> & {
+      id?: string;
+    },
   ) => string;
   /** Remove an interactable component by ID */
   removeInteractableComponent: (id: string) => void;

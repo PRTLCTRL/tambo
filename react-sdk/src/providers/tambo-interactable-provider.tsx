@@ -420,7 +420,9 @@ export const TamboInteractableProvider: React.FC<PropsWithChildren> = ({
 
   const addInteractableComponent = useCallback(
     (
-      component: Omit<TamboInteractableComponent, "createdAt"> & { id?: string },
+      component: Omit<TamboInteractableComponent, "id" | "createdAt"> & {
+        id?: string;
+      },
     ): string => {
       // Validate component name
       assertValidName(component.name, "component");
