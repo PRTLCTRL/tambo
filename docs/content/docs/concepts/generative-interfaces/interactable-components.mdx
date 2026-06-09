@@ -37,6 +37,73 @@ When you wrap a component with `withTamboInteractable`, Tambo creates an automat
 
 Place these wherever you normally would within the application to enable a traditional, statically-organized, user interface enhanced with AI capabilities.
 
+## Automatic Interactables
+
+By default, components that Tambo generates through conversations are one-time creations — they render once and cannot be updated later. If you want **all generated components** to automatically become interactable without explicitly using `withTamboInteractable`, enable the `autoAddInteractables` prop on `TamboProvider`:
+
+```tsx
+<TamboProvider
+  apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
+  userKey={currentUserId}
+  components={components}
+  autoAddInteractables={true}
+>
+  <App />
+</TamboProvider>
+```
+
+When enabled, every component Tambo generates in response to user messages is automatically registered as an interactable. This means:
+
+- Users can ask Tambo to update previously-generated components
+- No need to manually wrap components with `withTamboInteractable`
+- All component schemas and update tools are registered automatically
+- Component state persists across updates
+
+### Use Cases for Automatic Interactables
+
+**Dynamic workflows** where users iterate on AI-generated content:
+
+```tsx
+// User: "Create a task board"
+// Tambo generates: <TaskBoard tasks={[...]} />
+
+// User: "Add a new task 'Review PR'"
+// Tambo updates the existing TaskBoard instead of creating a new one
+```
+
+**Exploratory interfaces** where the specific components aren't known ahead of time:
+
+```tsx
+// Instead of showing a chat history, display only the current interactables:
+const { interactableComponents } = useTamboInteractable();
+
+return (
+  <div>
+    {interactableComponents.map((component) => (
+      <ComponentRenderer key={component.id} content={component} />
+    ))}
+  </div>
+);
+```
+
+**Multi-step refinement** where components evolve through conversation:
+
+```tsx
+// User: "Show me sales data"
+// Tambo generates: <SalesChart data={[...]} />
+
+// User: "Change it to a pie chart"
+// Tambo updates the existing chart's props instead of creating a new one
+```
+
+### When to Use Manual vs Automatic
+
+| Pattern                     | Approach                    | When to Use                                                          |
+| --------------------------- | --------------------------- | -------------------------------------------------------------------- |
+| **Pre-placed components**   | `withTamboInteractable`     | You control the UI layout and want specific components updatable     |
+| **Generated components**    | `autoAddInteractables`      | AI chooses which components to show and users iterate on them        |
+| **Hybrid approach**         | Both                        | Some components are pre-placed, others are generated and interacted  |
+
 <LearnMore
   title="How to register Interactable components"
   description="Step-by-step guide to making your components Interactable"
