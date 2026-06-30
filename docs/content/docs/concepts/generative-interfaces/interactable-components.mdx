@@ -12,6 +12,16 @@ You place them, set their initial state, and users can interact with them direct
 
 This creates a conversational interface where traditional UI manipulation and natural language interaction work together. A user might click and edit a note's title, then ask Tambo to "update the content of this note with today's meeting notes," both modifying the same component.
 
+## Choosing Your Interactables Approach
+
+Tambo offers two ways to make components interactable:
+
+1. **Manual registration** - You explicitly wrap components with `withTamboInteractable()` to make them interactable. This gives you fine-grained control over exactly which components Tambo can modify.
+
+2. **Automatic interactables** - Enable `autoAddToInteractables` on `TamboProvider` to make all generated components automatically interactable without manual wrapping. This is perfect when you want Tambo to be able to update any component it generates.
+
+Choose manual registration when you need precise control over which components are editable. Choose automatic interactables when you want Tambo to freely update any component it creates.
+
 ## How Interactables Work
 
 Interactables are normal React components that you build and then wrap with Tambo's `withTamboInteractable` to give Tambo access to them.
@@ -36,6 +46,40 @@ When you wrap a component with `withTamboInteractable`, Tambo creates an automat
 **Automatic Tool Registration**: Update tools are automatically registered to allow Tambo to update the component's props when needed.
 
 Place these wherever you normally would within the application to enable a traditional, statically-organized, user interface enhanced with AI capabilities.
+
+## Automatic Interactables
+
+For scenarios where you want Tambo to be able to update any component it generates without manually wrapping each one, enable automatic interactables:
+
+```tsx
+import { TamboProvider } from "@tambo-ai/react";
+
+function App() {
+  return (
+    <TamboProvider
+      apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
+      components={[WeatherCard, RecipeCard]}
+      autoAddToInteractables={true}
+    >
+      <ChatInterface />
+    </TamboProvider>
+  );
+}
+```
+
+With `autoAddToInteractables` enabled, every component Tambo generates is automatically added to the interactables registry. This means users can ask Tambo to "update that weather card to show tomorrow's forecast" or "change the recipe servings to 4" without you having to manually wrap each component.
+
+**When to use automatic interactables:**
+
+- You want Tambo to freely update any component it creates
+- You're building a chat interface where components are generated dynamically
+- You want to allow users to iterate on AI-generated content through conversation
+
+**When to use manual wrapping:**
+
+- You need precise control over which components are editable
+- You have pre-placed components with specific update behavior
+- You want to limit which properties Tambo can modify
 
 <LearnMore
   title="How to register Interactable components"

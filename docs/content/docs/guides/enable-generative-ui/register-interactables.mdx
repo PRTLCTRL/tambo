@@ -8,6 +8,11 @@ import { BookOpen } from "lucide-react";
 
 This guide shows you how to register React components as "Interactable" so Tambo can modify their props in response to user messages. Unlike generative components that Tambo creates on-demand, Interactable components are pre-placed by you and allow Tambo to update them in place.
 
+Tambo offers two approaches to making components interactable:
+
+1. **Manual registration** (covered in this guide) - Wrap specific components with `withTamboInteractable`
+2. **Automatic interactables** - Enable `autoAddToInteractables` on `TamboProvider` to make all generated components automatically interactable (see below)
+
 <LearnMore
   title="Learn more about Interactable components"
   description="Understand what Interactable components are and when to use them"
@@ -189,3 +194,52 @@ export default function Page() {
   );
 }
 ```
+
+## Alternative: Automatic Interactables
+
+If you want Tambo to automatically make all generated components interactable without manually wrapping them, you can enable automatic interactables on the `TamboProvider`:
+
+```tsx
+import { TamboProvider } from "@tambo-ai/react";
+import { Note } from "./note";
+import { z } from "zod";
+
+// Register your components normally
+const components = [
+  {
+    name: "Note",
+    description: "A simple note component",
+    component: Note,
+    propsSchema: z.object({
+      title: z.string(),
+      content: z.string(),
+    }),
+  },
+];
+
+export default function App() {
+  return (
+    <TamboProvider
+      apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
+      components={components}
+      autoAddToInteractables={true}
+    >
+      <ChatInterface />
+    </TamboProvider>
+  );
+}
+```
+
+With `autoAddToInteractables` enabled, every component Tambo generates is automatically added to the interactables registry, allowing users to update them through follow-up messages without any additional wrapping.
+
+**When to use automatic interactables:**
+
+- You want users to be able to iterate on any AI-generated component
+- You're building a chat interface with dynamic component generation
+- You want the simplest possible setup for component updates
+
+**When to use manual wrapping with `withTamboInteractable`:**
+
+- You need precise control over which components are editable
+- You have pre-placed components with specific initial state
+- You want to customize which properties can be modified
