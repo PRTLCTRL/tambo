@@ -407,6 +407,73 @@ function MyComponent(props: MyProps) {
 }
 ```
 
+### Nested Object Tracking
+
+For components with nested object props, `propStatus` contains nested status structures that mirror your prop shape:
+
+```tsx
+interface UserCardProps {
+  user: {
+    name: string;
+    email: string;
+    profile: {
+      bio: string;
+    };
+  };
+}
+
+function UserCard({ user }: UserCardProps) {
+  const { propStatus } = useTamboStreamStatus<UserCardProps>();
+
+  return (
+    <div>
+      <h3 className={propStatus.user?.name?.isStreaming ? "animate-pulse" : ""}>
+        {user.name}
+      </h3>
+      {propStatus.user?.email?.isSuccess && <p>{user.email}</p>}
+      {propStatus.user?.profile?.bio?.isSuccess && <p>{user.profile.bio}</p>}
+    </div>
+  );
+}
+```
+
+### Array Item Tracking
+
+For array props, `propStatus` includes `completedItems` and `streamingItems` to help you render only fully streamed items:
+
+```tsx
+interface TaskListProps {
+  tasks: Array<{ id: string; title: string; description: string }>;
+}
+
+function TaskList({ tasks }: TaskListProps) {
+  const { propStatus } = useTamboStreamStatus<TaskListProps>();
+
+  const completedTasks = propStatus.tasks?.completedItems ?? [];
+  const streamingTasks = propStatus.tasks?.streamingItems ?? [];
+
+  return (
+    <div>
+      <h3>Completed Tasks</h3>
+      {completedTasks.map((task) => (
+        <TaskCard key={task.id} {...task} />
+      ))}
+
+      {streamingTasks.length > 0 && (
+        <>
+          <h3>Loading...</h3>
+          {streamingTasks.map((task) => (
+            <TaskCard key={task.id} {...task} isStreaming />
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+```
+
+This is particularly useful when array items contain data you need to fetch or process. By waiting for items to complete streaming, you avoid making premature API calls with partial data.
+
 ### Return Values
 
 | Value          | Type                                                      | Description                                                                                                                                    |
