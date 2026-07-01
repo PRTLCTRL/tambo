@@ -14,7 +14,11 @@ This creates a conversational interface where traditional UI manipulation and na
 
 ## How Interactables Work
 
-Interactables are normal React components that you build and then wrap with Tambo's `withTamboInteractable` to give Tambo access to them.
+There are two ways to make components interactable:
+
+### Manual Registration with `withTamboInteractable`
+
+Wrap your components with `withTamboInteractable` to give Tambo access to them. This approach gives you full control over which components are interactable and when they're registered.
 
 ```tsx
 import { withTamboInteractable } from "@tambo-ai/react";
@@ -36,6 +40,31 @@ When you wrap a component with `withTamboInteractable`, Tambo creates an automat
 **Automatic Tool Registration**: Update tools are automatically registered to allow Tambo to update the component's props when needed.
 
 Place these wherever you normally would within the application to enable a traditional, statically-organized, user interface enhanced with AI capabilities.
+
+### Automatic Registration for Generated Components
+
+Set `autoRegisterInteractables` on the `TamboProvider` to automatically convert all AI-generated components into interactables. This is useful when you want Tambo to be able to update any component it generates, without manually wrapping each one.
+
+```tsx
+<TamboProvider
+  apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
+  components={components}
+  autoRegisterInteractables={true}
+>
+  <Chat />
+</TamboProvider>
+```
+
+When enabled, any component that Tambo generates in response to a message is automatically added to the interactables list. This means users can ask Tambo to update previously-generated components without you having to manually register them.
+
+**Example workflow:**
+
+1. User asks: "Show me a chart of Q4 sales"
+2. Tambo generates a `SalesChart` component with Q4 data
+3. User asks: "Update that chart to show Q3 instead"
+4. Because `autoRegisterInteractables` is enabled, Tambo can find and update the existing chart rather than creating a new one
+
+This setting defaults to `false` to maintain backward compatibility and give you explicit control over which components are interactable.
 
 <LearnMore
   title="How to register Interactable components"

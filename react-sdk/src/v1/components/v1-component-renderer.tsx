@@ -13,13 +13,15 @@
  */
 
 import { parse } from "partial-json";
-import React, { type FC, useMemo, useContext } from "react";
+import React, { type FC, useMemo, useContext, useEffect, useRef } from "react";
 import { TamboRegistryContext } from "../../providers/tambo-registry-provider";
+import { useTamboInteractable } from "../../providers/tambo-interactable-provider";
 import { isStandardSchema } from "../../schema";
 import { isPromise } from "../../util/is-promise";
 import { getComponentFromRegistry } from "../../util/registry";
 import type { TamboComponentContent } from "../types/message";
 import { ComponentContentProvider } from "../utils/component-renderer";
+import { useTamboConfig } from "../providers/tambo-v1-provider";
 
 export interface ComponentRendererProps {
   /**
@@ -76,6 +78,10 @@ export const ComponentRenderer: FC<ComponentRendererProps> = ({
   fallback = null,
 }) => {
   const registry = useContext(TamboRegistryContext);
+  const { autoRegisterInteractables } = useTamboConfig();
+  const { addInteractableComponent, getInteractableComponentsByName } =
+    useTamboInteractable();
+  const hasAutoRegistered = useRef(false);
 
   // Memoize the rendered element - only recreates when props change
   const element = useMemo(() => {
@@ -136,6 +142,62 @@ export const ComponentRenderer: FC<ComponentRendererProps> = ({
     messageId,
     threadId,
     registry.componentList,
+  ]);
+
+  // Automatically register as interactable if flag is enabled
+  useEffect(() => {
+    if (
+      autoRegisterInteractables &&
+      !hasAutoRegistered.current &&
+      element !== null &&
+      content.streamingState === "complete"
+    ) {
+      try {
+        const registeredComponent = getComponentFromRegistry(
+          content.name,
+          registry.componentList,
+        );
+
+        // Check if an interactable with this component name and these exact props already exists
+        const existingInteractables =
+          getInteractableComponentsByName(content.name);
+        const alreadyExists = existingInteractables.some((interactable) => {
+          return (
+            JSON.stringify(interactable.props) === JSON.stringify(content.props)
+          );
+        });
+
+        if (!alreadyExists) {
+          addInteractableComponent({
+            name: content.name,
+            description:
+              registeredComponent.description ??
+              `Component ${content.name} from message`,
+            component: registeredComponent.component,
+            props: content.props ?? {},
+            propsSchema: registeredComponent.props,
+          });
+          hasAutoRegistered.current = true;
+        }
+      } catch (error) {
+        console.warn(
+          "[ComponentRenderer] Failed to auto-register interactable",
+          {
+            componentName: content.name,
+            error,
+          },
+        );
+      }
+    }
+  }, [
+    autoRegisterInteractables,
+    content.name,
+    content.props,
+    content.streamingState,
+    element,
+    registry.componentList,
+    addInteractableComponent,
+    getInteractableComponentsByName,
   ]);
 
   if (element === null) {
